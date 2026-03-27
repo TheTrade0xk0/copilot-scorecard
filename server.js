@@ -10,44 +10,46 @@ const PORT = process.env.PORT || 3000;
 let CLAUDE_PATH = null;
 
 function findClaude() {
+  // Get npm global bin directory from prefix
   try {
-    const p = execSync('which claude 2>/dev/null || true', { stdio: 'pipe' }).toString().trim();
-    if (p) { console.log(`[find] which claude: ${p}`); return p; }
-  } catch {}
-
-  try {
-    const npmBin = execSync('npm bin -g 2>/dev/null || true', { stdio: 'pipe' }).toString().trim().split('\n')[0];
-    if (npmBin) {
-      const p = `${npmBin}/claude`;
-      execSync(`${p} --version`, { stdio: 'pipe', timeout: 5000 });
-      console.log(`[find] npm global bin: ${p}`);
-      return p;
+    const prefix = execSync('npm config get prefix 2>/dev/null', { stdio: 'pipe' }).toString().trim();
+    if (prefix) {
+      const p = `${prefix}/bin/claude`;
+      try {
+        execSync(`ls "${p}"`, { stdio: 'pipe' });
+        console.log(`[find] found via npm prefix: ${p}`);
+        return p;
+      } catch {}
     }
   } catch {}
 
-  const candidates = [
-    '/usr/local/bin/claude',
-    '/usr/bin/claude',
-    '/root/.npm-global/bin/claude',
-    '/root/.local/bin/claude',
-    '/app/.npm-global/bin/claude',
-    '/home/railway/.npm-global/bin/claude',
-    '/usr/local/lib/node_modules/.bin/claude',
-    '/usr/local/lib/node_modules/@anthropic-ai/claude-code/bin/claude',
-  ];
-  for (const c of candidates) {
-    try {
-      execSync(`ls ${c} 2>/dev/null`, { stdio: 'pipe' });
-      console.log(`[find] found at: ${c}`);
-      return c;
-    } catch {}
-  }
-
+  // Try npm bin -g directly
   try {
-    const found = execSync('find /usr /root /app /home -name "claude" -type f 2>/dev/null | head -5', { stdio: 'pipe', timeout: 10000 }).toString().trim();
+    const binDir = execSync('npm bin -g 2>/dev/null', { stdio: 'pipe' }).toString().trim();
+    if (binDir) {
+      const p = `${binDir}/claude`;
+      try {
+        execSync(`ls "${p}"`, { stdio: 'pipe' });
+        console.log(`[find] found via npm bin -g: ${p}`);
+        return p;
+      } catch {}
+    }
+  } catch {}
+
+  // which claude
+  try {
+    const p = execSync('which claude 2>/dev/null', { stdio: 'pipe' }).toString().trim();
+    if (p) { console.log(`[find] which: ${p}`); return p; }
+  } catch {}
+
+  // find everywhere
+  try {
+    const found = execSync('find / -name "claude" -type f 2>/dev/null | grep bin | head -3', {
+      stdio: 'pipe', timeout: 15000
+    }).toString().trim();
     if (found) {
       const first = found.split('\n')[0];
-      console.log(`[find] find command: ${first}`);
+      console.log(`[find] find: ${first}`);
       return first;
     }
   } catch {}
@@ -65,21 +67,20 @@ function installClaude() {
     try {
       const ls = execSync(`ls ${prefix}/bin/ 2>/dev/null | grep claude || true`, { stdio: 'pipe' }).toString().trim();
       console.log(`[setup] bin contents: ${ls || 'empty'}`);
+      // Return the path directly
+      if (ls.includes('claude')) return `${prefix}/bin/claude`;
     } catch {}
   } catch (e) {
     console.error('[setup] Install failed:', e.message);
   }
+  return null;
 }
 
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    claude: CLAUDE_PATH || 'not found',
-    pat: process.env.COLOSSEUM_COPILOT_PAT ? 'set' : 'missing',
-  });
+  res.json({ status: 'ok', claude: CLAUDE_PATH || 'not found', pat: process.env.COLOSSEUM_COPILOT_PAT ? 'set' : 'missing' });
 });
 
 app.post('/research', async (req, res) => {
@@ -97,7 +98,6 @@ app.post('/research', async (req, res) => {
   if (!category) return res.status(400).json({ error: 'Category is required' });
   if (!country) return res.status(400).json({ error: 'Country is required' });
 
-  // Use PAT from user request, fall back to server env var
   const colosseum_pat = user_pat || process.env.COLOSSEUM_COPILOT_PAT;
   if (!colosseum_pat) return res.status(500).json({ error: 'Colosseum PAT missing' });
 
@@ -140,7 +140,6 @@ After your research, return ONLY a valid JSON object (no markdown, no explanatio
       COLOSSEUM_COPILOT_API_BASE: 'https://copilot.colosseum.com/api/v1',
       COLOSSEUM_COPILOT_PAT: colosseum_pat,
       HOME: process.env.HOME || '/root',
-      PATH: process.env.PATH + ':/usr/local/bin:/root/.npm-global/bin:/usr/local/lib/node_modules/.bin',
     };
 
     const { stdout } = await execFileAsync(
@@ -186,13 +185,16 @@ After your research, return ONLY a valid JSON object (no markdown, no explanatio
 
 async function main() {
   console.log('[setup] Checking for Claude Code...');
-  console.log(`[setup] PATH: ${process.env.PATH}`);
 
   CLAUDE_PATH = findClaude();
 
   if (!CLAUDE_PATH) {
-    installClaude();
-    CLAUDE_PATH = findClaude();
+    const installed = installClaude();
+    if (installed) {
+      CLAUDE_PATH = installed;
+    } else {
+      CLAUDE_PATH = findClaude();
+    }
   }
 
   console.log(`[server] Claude: ${CLAUDE_PATH ? '✓ ' + CLAUDE_PATH : '✗ NOT FOUND'}`);
