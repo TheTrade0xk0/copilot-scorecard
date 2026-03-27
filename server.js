@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { execSync, execFile } = require('child_process');
+const { execSync, execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 
 const execFileAsync = promisify(execFile);
@@ -10,50 +10,21 @@ const PORT = process.env.PORT || 3000;
 let CLAUDE_PATH = null;
 
 function findClaude() {
-  // Get npm global bin directory from prefix
   try {
     const prefix = execSync('npm config get prefix 2>/dev/null', { stdio: 'pipe' }).toString().trim();
     if (prefix) {
       const p = `${prefix}/bin/claude`;
-      try {
-        execSync(`ls "${p}"`, { stdio: 'pipe' });
-        console.log(`[find] found via npm prefix: ${p}`);
-        return p;
-      } catch {}
+      try { execSync(`ls "${p}"`, { stdio: 'pipe' }); console.log(`[find] prefix: ${p}`); return p; } catch {}
     }
   } catch {}
-
-  // Try npm bin -g directly
-  try {
-    const binDir = execSync('npm bin -g 2>/dev/null', { stdio: 'pipe' }).toString().trim();
-    if (binDir) {
-      const p = `${binDir}/claude`;
-      try {
-        execSync(`ls "${p}"`, { stdio: 'pipe' });
-        console.log(`[find] found via npm bin -g: ${p}`);
-        return p;
-      } catch {}
-    }
-  } catch {}
-
-  // which claude
   try {
     const p = execSync('which claude 2>/dev/null', { stdio: 'pipe' }).toString().trim();
     if (p) { console.log(`[find] which: ${p}`); return p; }
   } catch {}
-
-  // find everywhere
   try {
-    const found = execSync('find / -name "claude" -type f 2>/dev/null | grep bin | head -3', {
-      stdio: 'pipe', timeout: 15000
-    }).toString().trim();
-    if (found) {
-      const first = found.split('\n')[0];
-      console.log(`[find] find: ${first}`);
-      return first;
-    }
+    const found = execSync('find / -name "claude" -type f 2>/dev/null | grep bin | head -3', { stdio: 'pipe', timeout: 15000 }).toString().trim();
+    if (found) { const f = found.split('\n')[0]; console.log(`[find] find: ${f}`); return f; }
   } catch {}
-
   return null;
 }
 
@@ -64,16 +35,43 @@ function installClaude() {
     console.log(`[setup] npm prefix: ${prefix}`);
     execSync('npm install -g @anthropic-ai/claude-code', { stdio: 'inherit', timeout: 180000 });
     console.log('[setup] Install complete');
-    try {
-      const ls = execSync(`ls ${prefix}/bin/ 2>/dev/null | grep claude || true`, { stdio: 'pipe' }).toString().trim();
-      console.log(`[setup] bin contents: ${ls || 'empty'}`);
-      // Return the path directly
-      if (ls.includes('claude')) return `${prefix}/bin/claude`;
-    } catch {}
-  } catch (e) {
-    console.error('[setup] Install failed:', e.message);
-  }
+    const ls = execSync(`ls ${prefix}/bin/ 2>/dev/null | grep claude || true`, { stdio: 'pipe' }).toString().trim();
+    console.log(`[setup] bin contents: ${ls || 'empty'}`);
+    if (ls.includes('claude')) return `${prefix}/bin/claude`;
+  } catch (e) { console.error('[setup] Install failed:', e.message); }
   return null;
+}
+
+// Run claude with stdin explicitly closed to avoid interactive mode
+function runClaude(claudePath, args, env) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(claudePath, args, {
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 120000,
+    });
+
+    // Close stdin immediately so claude doesn't wait for input
+    proc.stdin.end();
+
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', d => { stdout += d.toString(); });
+    proc.stderr.on('data', d => { stderr += d.toString(); });
+
+    proc.on('close', code => {
+      if (code !== 0 && !stdout) {
+        reject(new Error(`Claude exited with code ${code}: ${stderr.slice(0, 500)}`));
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+
+    proc.on('error', reject);
+
+    // Safety timeout
+    setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 115000);
+  });
 }
 
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
@@ -142,10 +140,10 @@ After your research, return ONLY a valid JSON object (no markdown, no explanatio
       HOME: process.env.HOME || '/root',
     };
 
-    const { stdout } = await execFileAsync(
+    const { stdout } = await runClaude(
       CLAUDE_PATH,
       ['-p', prompt, '--output-format', 'json', '--max-turns', '10'],
-      { env, timeout: 120000, maxBuffer: 1024 * 1024 * 10 }
+      env
     );
 
     if (!stdout) throw new Error('No response from Claude Code');
@@ -175,7 +173,7 @@ After your research, return ONLY a valid JSON object (no markdown, no explanatio
     console.error(`[research] Error: ${err.message}`);
     if (err.message.includes('401') || err.message.includes('invalid_api_key'))
       return res.status(401).json({ error: 'Invalid Anthropic API key' });
-    if (err.killed || err.message.includes('timeout'))
+    if (err.message.includes('timeout'))
       return res.status(408).json({ error: 'Research timed out — try again' });
     if (err.message.includes('rate_limit'))
       return res.status(429).json({ error: 'Rate limit hit — retry in a moment' });
@@ -185,24 +183,14 @@ After your research, return ONLY a valid JSON object (no markdown, no explanatio
 
 async function main() {
   console.log('[setup] Checking for Claude Code...');
-
   CLAUDE_PATH = findClaude();
-
   if (!CLAUDE_PATH) {
     const installed = installClaude();
-    if (installed) {
-      CLAUDE_PATH = installed;
-    } else {
-      CLAUDE_PATH = findClaude();
-    }
+    CLAUDE_PATH = installed || findClaude();
   }
-
   console.log(`[server] Claude: ${CLAUDE_PATH ? '✓ ' + CLAUDE_PATH : '✗ NOT FOUND'}`);
   console.log(`[server] PAT: ${process.env.COLOSSEUM_COPILOT_PAT ? '✓ set' : '✗ MISSING'}`);
-
-  app.listen(PORT, () => {
-    console.log(`[server] Running on port ${PORT}`);
-  });
+  app.listen(PORT, () => console.log(`[server] Running on port ${PORT}`));
 }
 
 main();
