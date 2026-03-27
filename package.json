@@ -1,0 +1,14 @@
+{
+  "name": "copilot-scorecard-backend",
+  "version": "1.0.0",
+  "description": "Colosseum Copilot Scorecard Backend",
+  "main": "server.js",
+  "scripts": {
+    "build": "npm install -g @anthropic-ai/claude-code",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
