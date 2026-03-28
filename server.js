@@ -445,7 +445,7 @@ app.get('/share/:filename', (req, res) => {
 
 app.get('/project/:slug', async (req, res) => {
   const { slug } = req.params;
-  const pat = req.headers['x-colosseum-pat'] || process.env.COLOSSEUM_COPILOT_PAT;
+  const pat = req.query.pat || req.headers['x-colosseum-pat'] || process.env.COLOSSEUM_COPILOT_PAT;
   if (!pat) return res.status(400).json({ error: 'Colosseum PAT required' });
   try {
     const data = await copilotGet(`projects/by-slug/${slug}`, pat);
