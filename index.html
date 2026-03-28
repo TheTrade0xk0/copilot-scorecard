@@ -434,10 +434,7 @@ function openProjectModal(slug) {
   overlay.classList.add('visible');
 
   const pat = document.getElementById('colosseum-pat').value.trim() || '';
-
-  fetch(`${BACKEND_URL}/project/${slug}`, {
-    headers: { 'x-colosseum-pat': pat }
-  })
+  fetch(`${BACKEND_URL}/project/${slug}?pat=${encodeURIComponent(pat)}`)
   .then(r => r.json())
   .then(data => {
     if (!data.success) throw new Error(data.error || 'Failed to load');
@@ -618,12 +615,13 @@ function renderScorecard(r) {
   document.getElementById('btn-dive').disabled = false;
 
   if (r.top_competing_projects && r.top_competing_projects.length) {
-    document.getElementById('sc-competing-list').innerHTML = r.top_competing_projects.map(p =>
-      `<span class="sc-competing-tag">
-        ${p}
+    document.getElementById('sc-competing-list').innerHTML = r.top_competing_projects.map(p => {
+      const displayName = p.replace(/-\d+$/, '').replace(/-/g, ' ');
+      return `<span class="sc-competing-tag">
+        ${displayName}
         <button class="info-btn" onclick="openProjectModal('${p}')" title="View project details">ⓘ</button>
-      </span>`
-    ).join('');
+      </span>`;
+    }).join('');
   } else {
     document.getElementById('sc-competing-list').innerHTML = '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2)">No direct competitors found in corpus</span>';
   }
