@@ -108,7 +108,28 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0
 .sc-competing-tag{font-family:var(--font-mono);font-size:11px;padding:4px 10px;border:1px solid var(--border2);border-radius:4px;color:var(--muted);background:var(--surface2);display:inline-flex;align-items:center;gap:6px;}
 .info-btn{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:12px;padding:0;line-height:1;transition:color .2s;}
 .info-btn:hover{color:var(--green);}
-.project-modal-title{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px;}
+.dive-section{margin-bottom:24px;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.dive-header{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;}
+.dive-title{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.btn-dive{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:var(--green-dim);border:1px solid var(--green);color:var(--green);border-radius:6px;padding:6px 12px;cursor:pointer;transition:background .2s;}
+.btn-dive:hover{background:#00e5a025;}
+.btn-dive:disabled{opacity:.4;cursor:not-allowed;}
+.dive-body{display:none;padding:0 16px 16px;}
+.dive-body.visible{display:block;}
+.dive-competitor{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;}
+.dive-competitor:last-child{margin-bottom:0;}
+.dive-comp-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.dive-comp-name{font-family:var(--font-mono);font-size:12px;font-weight:500;color:var(--text);}
+.dive-comp-hackathon{font-family:var(--font-mono);font-size:10px;color:var(--muted);}
+.dive-comp-prize{font-family:var(--font-mono);font-size:10px;color:var(--amber);}
+.overlap-direct{color:var(--red);border-color:var(--red);}
+.overlap-adjacent{color:var(--amber);border-color:var(--amber);}
+.overlap-tangential{color:var(--muted);border-color:var(--border2);}
+.overlap-badge{font-family:var(--font-mono);font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid;text-transform:uppercase;letter-spacing:.06em;}
+.dive-comp-row{font-size:12px;color:#999;line-height:1.6;margin-bottom:6px;}
+.dive-comp-row strong{color:var(--muted);font-weight:500;}
+.dive-comp-diff{font-size:12px;color:var(--green);line-height:1.6;background:var(--green-dim);border:1px solid #00e5a020;border-radius:6px;padding:8px 10px;margin-top:8px;}
+.dive-landscape{background:var(--surface2);border:1px solid var(--border);border-left:2px solid var(--amber);border-radius:8px;padding:14px;font-size:13px;color:#aaa;line-height:1.7;margin-top:12px;}
 .project-modal-meta{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px;}
 .project-modal-desc{font-size:13px;color:#aaa;line-height:1.7;margin-bottom:16px;}
 .project-modal-tags{display:flex;flex-wrap:wrap;gap:6px;}
@@ -196,6 +217,13 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
       <div class="sc-competing" id="sc-competing" style="display:none">
         <div class="sc-competing-title">Competing projects found</div>
         <div class="sc-competing-list" id="sc-competing-list"></div>
+      </div>
+      <div class="dive-section" id="dive-section" style="display:none">
+        <div class="dive-header">
+          <span class="dive-title">Competitive Deep-Dive</span>
+          <button class="btn-dive" id="btn-dive" onclick="runCompetitiveDive()">Run Analysis →</button>
+        </div>
+        <div class="dive-body" id="dive-body"></div>
       </div>
       <div class="sc-actions">
         <button class="btn-sec" onclick="exportImage()">Export for X →</button>
@@ -317,6 +345,56 @@ const DIMS = [
   { key: 'archive_backing',     label: 'Archive Backing' },
   { key: 'builder_density',     label: 'Builder Density' },
 ];
+
+async function runCompetitiveDive() {
+  if (!currentResult) return;
+  const btn = document.getElementById('btn-dive');
+  const body = document.getElementById('dive-body');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing...';
+  body.innerHTML = '<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:8px 0;">Running competitive analysis...</div>';
+  body.classList.add('visible');
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/competitive-dive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        anthropic_key: document.getElementById('anthropic-key').value.trim(),
+        colosseum_pat: document.getElementById('colosseum-pat').value.trim(),
+        project_name: currentResult.project_name,
+        category: currentResult.category,
+        description: document.getElementById('description').value.trim(),
+        competing_slugs: currentResult.top_competing_projects || [],
+      }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Analysis failed');
+
+    const { competitors, landscape_summary } = data.analysis;
+
+    body.innerHTML = competitors.map(c => `
+      <div class="dive-competitor">
+        <div class="dive-comp-header">
+          <span class="dive-comp-name">${c.name || c.slug}</span>
+          <span class="dive-comp-hackathon">${c.hackathon || ''}</span>
+          ${c.prize ? `<span class="dive-comp-prize">🏆 ${c.prize}</span>` : ''}
+          <span class="overlap-badge overlap-${c.overlap}">${c.overlap}</span>
+        </div>
+        <div class="dive-comp-row"><strong>What they built:</strong> ${c.what_they_built}</div>
+        <div class="dive-comp-row"><strong>Strengths:</strong> ${c.their_strengths}</div>
+        <div class="dive-comp-diff">💡 ${c.differentiation_angle}</div>
+      </div>
+    `).join('') + `<div class="dive-landscape">${landscape_summary}</div>`;
+
+    btn.textContent = 'Re-run →';
+    btn.disabled = false;
+  } catch (err) {
+    body.innerHTML = `<div style="color:var(--red);font-family:var(--font-mono);font-size:12px;">${err.message}</div>`;
+    btn.textContent = 'Run Analysis →';
+    btn.disabled = false;
+  }
+}
 
 function openProjectModal(slug) {
   const overlay = document.getElementById('modal-project-overlay');
@@ -472,8 +550,13 @@ function renderScorecard(r) {
         <button class="info-btn" onclick="openProjectModal('${p}')" title="View project details">ⓘ</button>
       </span>`
     ).join('');
+    document.getElementById('dive-section').style.display = 'block';
+    document.getElementById('dive-body').classList.remove('visible');
+    document.getElementById('btn-dive').textContent = 'Run Analysis →';
+    document.getElementById('btn-dive').disabled = false;
   } else {
     document.getElementById('sc-competing').style.display = 'none';
+    document.getElementById('dive-section').style.display = 'none';
   }
 
   document.getElementById('btn-submit').disabled = false;
