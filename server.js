@@ -58,7 +58,7 @@ function trimProject(p) {
     slug: p.slug,
     description: (p.description || p.summary || '').slice(0, 120),
     hackathon: p.hackathon?.slug || p.hackathon,
-    tags: (p.tags || []).slice(0, 4),
+    tags: Array.isArray(p.tags) ? p.tags.slice(0, 4) : p.tags,
     similarity: p.score || p.similarity,
   };
 }
