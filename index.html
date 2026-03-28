@@ -491,8 +491,6 @@ function hideCountries() {
 function getCountry() {
   return document.getElementById('country').value.trim();
 }
-
-function handleCountrySelect() {} // no-op, kept for safety
 function closeHelpBtn() { document.getElementById('modal-help-overlay').classList.remove('visible'); }
 function closeHelp(e) { if (e.target === document.getElementById('modal-help-overlay')) closeHelpBtn(); }
 
@@ -500,24 +498,6 @@ function openPatHelp() { document.getElementById('modal-pat-overlay').classList.
 function closePatHelpBtn() { document.getElementById('modal-pat-overlay').classList.remove('visible'); }
 function closePatHelp(e) { if (e.target === document.getElementById('modal-pat-overlay')) closePatHelpBtn(); }
 
-function handleCountrySelect(val) {
-  const input = document.getElementById('country');
-  if (val === 'other') {
-    input.style.display = 'block';
-    input.value = '';
-    input.focus();
-  } else {
-    input.style.display = 'none';
-    input.value = val;
-  }
-}
-
-function getCountry() {
-  const sel = document.getElementById('country-select').value;
-  const inp = document.getElementById('country').value.trim();
-  if (sel === 'other') return inp;
-  return sel || inp;
-}
 
 function openScorecardModal() { document.getElementById('modal-scorecard-overlay').classList.add('visible'); }
 function closeScorecardModal(e) { if (e.target === document.getElementById('modal-scorecard-overlay')) closeScorecardAndClear(); }
