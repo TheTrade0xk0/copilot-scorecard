@@ -260,11 +260,12 @@ ${JSON.stringify(filters?.hackathons || [])}
 ${JSON.stringify(analyze || 'Not available')}
 
 SCORING RULES — follow these strictly to ensure consistent scores:
-- novelty: 1-3 if 5+ very similar projects found, 4-6 if some overlap, 7-9 if few matches, 10 if truly unique
+- CRITICAL: If a corpus project slug matches or closely resembles the project_name being scored (e.g. 'backyard-finance' when scoring 'Backyard Finance'), treat it as the SAME project at an earlier stage — NOT a competitor. Exclude it from novelty, competitive_gap, hackathon_precedent, and builder_density penalty calculations. Do NOT count a project's own prior submissions against it.
+- novelty: 1-3 if 5+ very similar EXTERNAL projects found, 4-6 if some overlap, 7-9 if few matches, 10 if truly unique
 - competitive_gap: 1-3 if accelerator projects directly compete, 4-6 if adjacent, 7-9 if no direct competition
-- hackathon_precedent: 1-3 if 10+ similar projects in corpus, 4-6 if 3-9 similar, 7-9 if 1-2 similar, 10 if none
+- hackathon_precedent: 1-3 if 10+ similar EXTERNAL projects in corpus, 4-6 if 3-9 similar, 7-9 if 1-2 similar, 10 if none
 - builder_density: 1-3 if very crowded (many projects), 4-6 moderate, 7-9 sparse
-- top_competing_projects: pick the 5 most directly competing projects from the corpus data above, ranked by similarity (closest first). Only use slugs that actually appear in the data.
+- top_competing_projects: pick the 5 most directly competing EXTERNAL projects. Never include the project's own prior submissions.
 - accelerator_overlap: 1-3 if direct accelerator competitors found, 4-6 adjacent, 7-10 if none
 - market_timing: base on archive evidence strength — 1-3 weak, 4-6 moderate, 7-9 strong archive backing
 - archive_backing: 1-3 if 0-1 relevant archives, 4-6 if 2-3, 7-9 if 4+ strong matches
