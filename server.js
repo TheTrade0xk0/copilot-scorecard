@@ -4,9 +4,7 @@ const { execSync, spawn } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 let CLAUDE_PATH = null;
-let skillInstalled = false;
 
 function findClaude() {
   try {
@@ -23,55 +21,40 @@ function findClaude() {
   return null;
 }
 
-async function installSkill(pat) {
-  if (skillInstalled) return;
-  console.log('[setup] Installing Colosseum Copilot skill...');
-  try {
-    await new Promise((resolve) => {
-      const proc = spawn('npx', ['skills', 'add', 'ColosseumOrg/colosseum-copilot', '--yes'], {
-        env: {
-          ...process.env,
-          COLOSSEUM_COPILOT_API_BASE: 'https://copilot.colosseum.com/api/v1',
-          COLOSSEUM_COPILOT_PAT: pat,
-        },
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 60000,
-      });
-      // Send "global" scope selection
-      proc.stdin.write('\n');
-      proc.stdin.end();
-      proc.on('close', () => resolve());
-      setTimeout(() => { proc.kill(); resolve(); }, 55000);
-    });
-    skillInstalled = true;
-    console.log('[setup] ✓ Colosseum Copilot skill installed');
-  } catch (e) {
-    skillInstalled = true; // continue anyway
-    console.log('[setup] Skill install note:', e.message?.slice(0, 100));
-  }
-}
-
 function runClaude(claudePath, args, env) {
   return new Promise((resolve, reject) => {
-    console.log(`[claude] Running: ${claudePath} ${args.slice(0,2).join(' ')}...`);
+    console.log(`[claude] Spawning: ${claudePath}`);
+
     const proc = spawn(claudePath, args, {
-      env,
+      env: {
+        ...env,
+        // Disable auto-update and telemetry
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+        NO_UPDATE_NOTIFIER: '1',
+        DISABLE_AUTOUPDATER: '1',
+        CI: '1',
+      },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
+    // Close stdin immediately
     proc.stdin.end();
 
     let stdout = '';
     let stderr = '';
-    proc.stdout.on('data', d => { stdout += d.toString(); });
+
+    proc.stdout.on('data', d => {
+      stdout += d.toString();
+      process.stdout.write(`[claude:out] ${d.toString().slice(0,100)}\n`);
+    });
+
     proc.stderr.on('data', d => {
       stderr += d.toString();
-      // Log progress
-      if (stderr.length % 500 < 50) console.log(`[claude] progress: ${stderr.slice(-200)}`);
+      process.stdout.write(`[claude:err] ${d.toString().slice(0,100)}\n`);
     });
 
     proc.on('close', code => {
-      console.log(`[claude] Done. exit=${code} stdout=${stdout.length}b stderr=${stderr.length}b`);
+      console.log(`[claude] exit=${code} stdout=${stdout.length}b stderr=${stderr.length}b`);
       if (code !== 0 && !stdout) {
         reject(new Error(`Claude exited ${code}: ${stderr.slice(0, 500)}`));
       } else {
@@ -79,8 +62,16 @@ function runClaude(claudePath, args, env) {
       }
     });
 
-    proc.on('error', reject);
-    setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 180000);
+    proc.on('error', (err) => {
+      console.error('[claude] spawn error:', err.message);
+      reject(err);
+    });
+
+    setTimeout(() => {
+      console.log('[claude] Killing after timeout');
+      proc.kill('SIGTERM');
+      reject(new Error('timeout'));
+    }, 180000);
   });
 }
 
@@ -89,7 +80,21 @@ app.use(express.json({ limit: '1mb' }));
 app.use((req, res, next) => { res.setTimeout(240000); next(); });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', claude: CLAUDE_PATH || 'not found', skill: skillInstalled });
+  res.json({ status: 'ok', claude: CLAUDE_PATH || 'not found' });
+});
+
+// Test endpoint - runs a simple claude command to verify it works
+app.get('/test-claude', async (req, res) => {
+  if (!CLAUDE_PATH) return res.json({ error: 'Claude not found' });
+  try {
+    const { stdout } = await runClaude(CLAUDE_PATH, ['-p', 'Say "OK" and nothing else', '--output-format', 'json', '--max-turns', '1'], {
+      ...process.env,
+      ANTHROPIC_API_KEY: req.query.key || process.env.TEST_API_KEY || '',
+    });
+    res.json({ success: true, output: stdout.slice(0, 500) });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
 });
 
 app.post('/research', async (req, res) => {
@@ -106,9 +111,6 @@ app.post('/research', async (req, res) => {
 
   const colosseum_pat = user_pat || process.env.COLOSSEUM_COPILOT_PAT;
   if (!colosseum_pat) return res.status(500).json({ error: 'Colosseum PAT missing' });
-
-  // Install skill if not done yet
-  if (!skillInstalled) await installSkill(colosseum_pat);
 
   console.log(`[research] Starting: ${project_name}`);
 
@@ -151,7 +153,11 @@ After your research, return ONLY a valid JSON object (no markdown, no explanatio
       HOME: process.env.HOME || '/root',
     };
 
-    const { stdout } = await runClaude(CLAUDE_PATH, ['-p', prompt, '--output-format', 'json', '--max-turns', '15'], env);
+    const { stdout } = await runClaude(
+      CLAUDE_PATH,
+      ['-p', prompt, '--output-format', 'json', '--max-turns', '15'],
+      env
+    );
 
     if (!stdout) throw new Error('No response from Claude');
 
@@ -191,12 +197,6 @@ async function main() {
   CLAUDE_PATH = findClaude();
   console.log(`[server] Claude: ${CLAUDE_PATH ? '✓ ' + CLAUDE_PATH : '✗ NOT FOUND'}`);
   console.log(`[server] PAT: ${process.env.COLOSSEUM_COPILOT_PAT ? '✓ set' : '✗ MISSING'}`);
-
-  // Pre-install skill on startup using server PAT
-  if (process.env.COLOSSEUM_COPILOT_PAT && CLAUDE_PATH) {
-    installSkill(process.env.COLOSSEUM_COPILOT_PAT);
-  }
-
   app.listen(PORT, () => console.log(`[server] Running on port ${PORT}`));
 }
 
