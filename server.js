@@ -5,7 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const COPILOT_BASE = 'https://copilot.colosseum.com/api/v1';
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-colosseum-pat'] }));
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
 app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => { res.setTimeout(120000); next(); });
 
@@ -264,6 +264,7 @@ SCORING RULES — follow these strictly to ensure consistent scores:
 - competitive_gap: 1-3 if accelerator projects directly compete, 4-6 if adjacent, 7-9 if no direct competition
 - hackathon_precedent: 1-3 if 10+ similar projects in corpus, 4-6 if 3-9 similar, 7-9 if 1-2 similar, 10 if none
 - builder_density: 1-3 if very crowded (many projects), 4-6 moderate, 7-9 sparse
+- top_competing_projects: pick the 5 most directly competing projects from the corpus data above, ranked by similarity (closest first). Only use slugs that actually appear in the data.
 - accelerator_overlap: 1-3 if direct accelerator competitors found, 4-6 adjacent, 7-10 if none
 - market_timing: base on archive evidence strength — 1-3 weak, 4-6 moderate, 7-9 strong archive backing
 - archive_backing: 1-3 if 0-1 relevant archives, 4-6 if 2-3, 7-9 if 4+ strong matches
@@ -291,7 +292,7 @@ Return ONLY this JSON (no markdown):
   "builder_density": <1-10>,
   "builder_density_insight": "<2-3 sentences with specific counts from corpus data about how crowded this space is.>",
   "summary": "<3-4 sentences overall assessment with specific evidence, naming real projects and sources.>",
-  "top_competing_projects": ["<real slug>", "<real slug>", "<real slug>"],
+  "top_competing_projects": ["<closest slug>", "<2nd closest>", "<3rd closest>", "<4th closest>", "<5th closest>"],
   "key_sources": ["<real archive title>", "<real archive title>"]
 }`;
 
@@ -413,6 +414,33 @@ Return ONLY this JSON:
     console.error(`[competitive-dive] Error: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
+});
+
+const SUPABASE_URL = 'https://popeauzmykmmztjfekaa.supabase.co';
+
+app.get('/share/:filename', (req, res) => {
+  const { filename } = req.params;
+  const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/scorecards/${filename}`;
+  const projectName = filename.split('-').slice(0, -1).join(' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta property="og:title" content="${projectName} — Arena Research Score">
+  <meta property="og:description" content="Project idea scored by Arena Research, powered by Colosseum Copilot + Anthropic">
+  <meta property="og:image" content="${imageUrl}">
+  <meta property="og:image:width" content="1240">
+  <meta property="og:image:height" content="620">
+  <meta property="og:url" content="https://copilot-scorecard-production.up.railway.app/share/${filename}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${projectName} — Arena Research Score">
+  <meta name="twitter:description" content="Project idea scored by Arena Research, powered by Colosseum Copilot + Anthropic">
+  <meta name="twitter:image" content="${imageUrl}">
+  <meta http-equiv="refresh" content="0;url=https://copilot-scorecard.vercel.app">
+</head>
+<body>Redirecting...</body>
+</html>`);
 });
 
 app.get('/project/:slug', async (req, res) => {
