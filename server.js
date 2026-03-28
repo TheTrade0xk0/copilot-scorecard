@@ -423,7 +423,7 @@ app.get('/share/:filename', (req, res) => {
   const { filename } = req.params;
   const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/scorecards/${filename}`;
   const projectName = filename.replace(/-\d+\.png$/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  const appUrl = 'https://copilot-scorecard.vercel.app';
+  const appUrl = 'https://research-arena.vercel.app';
 
   res.setHeader('Cache-Control', 'no-cache');
   res.send(`<!DOCTYPE html>
