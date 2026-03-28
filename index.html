@@ -736,8 +736,10 @@ async function shareOnX() {
     if (!uploadRes.ok) throw new Error('Upload failed');
 
     const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/scorecards/${filename}`;
+    const shareUrl = `${BACKEND_URL}/share/${filename}`;
+
     const text = `Just scored ${currentResult.project_name} on Arena Research — ${currentResult.score}/10\n\nPowered by @Colosseum Copilot + @AnthropicAI\n\n`;
-    const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(imageUrl)}`;
+    const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
     window.open(xUrl, '_blank');
 
     toast('Opening X...', 'success');
