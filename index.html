@@ -18,7 +18,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:.3;pointer-events:none;z-index:0;}
 .wrap{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:0 24px;}
 
-/* NAV */
 nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid var(--border);}
 .nav-logo{font-family:var(--font-mono);font-size:12px;color:var(--green);letter-spacing:.12em;text-transform:uppercase;}
 .nav-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;}
@@ -26,13 +25,11 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0
 .nav-tab.active{background:var(--border2);color:var(--text);}
 .nav-tab:hover:not(.active){color:var(--text);}
 
-/* HERO */
 .hero{padding:48px 0 40px;}
 .hero h1{font-family:var(--font-display);font-size:clamp(36px,6vw,58px);font-weight:800;line-height:1.05;letter-spacing:-.03em;margin-bottom:16px;}
 .hero h1 span{color:var(--green);}
 .hero p{font-size:15px;color:var(--muted);line-height:1.7;max-width:480px;}
 
-/* FORM */
 .form-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;margin-bottom:48px;}
 .form-card::before{content:'';display:block;height:2px;background:linear-gradient(90deg,var(--green),transparent);margin:-32px -32px 32px;border-radius:16px 16px 0 0;}
 .section-label{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);}
@@ -49,28 +46,23 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0
 .note a{color:var(--green);text-decoration:none;}
 .notice{background:var(--surface2);border:1px solid var(--border2);border-left:2px solid var(--green);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.6;}
 .notice strong{color:var(--text);}
-
-/* TOOLTIP HELP BUTTON */
 .help-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--border2);border:1px solid var(--border2);color:var(--muted);font-size:10px;font-family:var(--font-mono);cursor:pointer;transition:all .2s;flex-shrink:0;line-height:1;}
 .help-btn:hover{background:var(--green);color:#000;border-color:var(--green);}
 
-/* STATUS */
 .status-bar{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:16px;font-family:var(--font-mono);font-size:12px;color:var(--green);display:none;align-items:center;gap:10px;}
 .status-bar.visible{display:flex;}
 .spinner{width:14px;height:14px;border:2px solid var(--green-dim);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
-/* RUN BUTTON */
 .btn-run{width:100%;background:var(--green);color:#000;font-family:var(--font-mono);font-size:13px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;border:none;border-radius:10px;padding:16px;cursor:pointer;transition:opacity .2s,transform .1s;margin-top:8px;}
 .btn-run:hover{opacity:.88;}
 .btn-run:active{transform:scale(.99);}
 .btn-run:disabled{opacity:.4;cursor:not-allowed;}
 
-/* MODAL OVERLAY */
+/* MODALS */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s;}
 .modal-overlay.visible{opacity:1;pointer-events:all;}
 
-/* HELP MODAL */
 .modal-help{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:32px;max-width:520px;width:100%;position:relative;max-height:80vh;overflow-y:auto;}
 .modal-help h2{font-family:var(--font-display);font-size:22px;font-weight:800;margin-bottom:20px;letter-spacing:-.02em;}
 .modal-help h2 span{color:var(--green);}
@@ -93,10 +85,21 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0
 .sc-score-big{text-align:right;}
 .sc-score-num{font-family:var(--font-display);font-size:56px;font-weight:800;color:var(--green);line-height:1;letter-spacing:-.04em;}
 .sc-score-label{font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
-.dims-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px;}
-.dim-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;}
-.dim-name{font-size:12px;color:var(--muted);}
-.dim-val{font-family:var(--font-mono);font-size:14px;font-weight:500;}
+
+/* COLLAPSIBLE DIMENSION ROWS */
+.dims-list{display:flex;flex-direction:column;gap:8px;margin-bottom:24px;}
+.dim-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.dim-header{display:flex;align-items:center;padding:12px 14px;cursor:pointer;gap:12px;transition:background .15s;}
+.dim-header:hover{background:#1a1a1a;}
+.dim-name{font-size:13px;color:var(--muted);flex:1;}
+.dim-bar-wrap{width:48px;height:3px;background:#1e1e1e;border-radius:2px;overflow:hidden;flex-shrink:0;}
+.dim-bar{height:100%;border-radius:2px;}
+.dim-val{font-family:var(--font-mono);font-size:14px;font-weight:500;min-width:16px;text-align:right;}
+.dim-arrow{font-size:10px;color:var(--muted2);transition:transform .2s;flex-shrink:0;margin-left:4px;}
+.dim-item.open .dim-arrow{transform:rotate(180deg);}
+.dim-insight{display:none;padding:0 14px 14px;font-size:12px;color:#999;line-height:1.7;border-top:1px solid var(--border);}
+.dim-item.open .dim-insight{display:block;}
+
 .high{color:var(--green);}.mid{color:var(--amber);}.low{color:var(--red);}
 .sc-summary{background:var(--surface2);border:1px solid var(--border);border-left:2px solid var(--green);border-radius:8px;padding:16px;font-size:13px;color:#aaa;line-height:1.7;margin-bottom:16px;}
 .sc-competing{margin-bottom:24px;}
@@ -136,7 +139,6 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0
 .empty-state{text-align:center;padding:64px 0;color:var(--muted);font-family:var(--font-mono);font-size:13px;}
 .empty-state div{font-size:32px;margin-bottom:12px;}
 
-/* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:14px 20px;font-family:var(--font-mono);font-size:12px;color:var(--text);z-index:200;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px;}
 .toast.show{transform:translateY(0);opacity:1;}
 .toast.success{border-color:var(--green);color:var(--green);}
@@ -146,7 +148,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0
 footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-content:space-between;align-items:center;}
 .footer-l{font-family:var(--font-mono);font-size:11px;color:var(--muted2);}
 .footer-r a{color:var(--green);text-decoration:none;font-family:var(--font-mono);font-size:11px;}
-@media(max-width:600px){.form-grid{grid-template-columns:1fr;}.dims-grid{grid-template-columns:1fr;}.sc-actions{flex-direction:column;}.hero h1{font-size:36px;}.sc-score-num{font-size:40px;}.modal-scorecard-inner{padding:20px;}}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr;}.sc-actions{flex-direction:column;}.hero h1{font-size:36px;}.sc-score-num{font-size:40px;}.modal-scorecard-inner{padding:20px;}}
 </style>
 </head>
 <body>
@@ -156,26 +158,11 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
   <div class="modal-help">
     <button class="modal-close" onclick="closeHelpBtn()">✕</button>
     <h2>How to get an <span>Anthropic API Key</span></h2>
-    <div class="modal-step">
-      <div class="modal-step-num">1</div>
-      <div class="modal-step-body">Go to <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> and sign up or log in.</div>
-    </div>
-    <div class="modal-step">
-      <div class="modal-step-num">2</div>
-      <div class="modal-step-body">In the left sidebar, click <strong>API Keys</strong>.</div>
-    </div>
-    <div class="modal-step">
-      <div class="modal-step-num">3</div>
-      <div class="modal-step-body">Click <strong>Create Key</strong>, give it a name, and copy the key. It starts with <code>sk-ant-</code>.</div>
-    </div>
-    <div class="modal-step">
-      <div class="modal-step-num">4</div>
-      <div class="modal-step-body">Add a payment method under <strong>Billing</strong>. New accounts get <strong>$5 free credits</strong> — enough for ~125 research runs.</div>
-    </div>
-    <div class="modal-step">
-      <div class="modal-step-num">5</div>
-      <div class="modal-step-body">Paste the key into the field above. <strong>It is never stored</strong> — used only for your request.</div>
-    </div>
+    <div class="modal-step"><div class="modal-step-num">1</div><div class="modal-step-body">Go to <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> and sign up or log in.</div></div>
+    <div class="modal-step"><div class="modal-step-num">2</div><div class="modal-step-body">In the left sidebar, click <strong>API Keys</strong>.</div></div>
+    <div class="modal-step"><div class="modal-step-num">3</div><div class="modal-step-body">Click <strong>Create Key</strong>, give it a name, and copy the key. It starts with <code>sk-ant-</code>.</div></div>
+    <div class="modal-step"><div class="modal-step-num">4</div><div class="modal-step-body">Add a payment method under <strong>Billing</strong>. New accounts get <strong>$5 free credits</strong> — enough for ~125 research runs.</div></div>
+    <div class="modal-step"><div class="modal-step-num">5</div><div class="modal-step-body">Paste the key into the field above. <strong>It is never stored</strong> — used only for your request.</div></div>
   </div>
 </div>
 
@@ -187,7 +174,7 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
         <div><div class="sc-project" id="sc-proj-name">—</div><div class="sc-meta" id="sc-meta">—</div></div>
         <div class="sc-score-big"><div class="sc-score-num" id="sc-score">—</div><div class="sc-score-label">/ 10 overall</div></div>
       </div>
-      <div class="dims-grid" id="dims-grid"></div>
+      <div class="dims-list" id="dims-list"></div>
       <div class="sc-summary" id="sc-summary"></div>
       <div class="sc-competing" id="sc-competing" style="display:none">
         <div class="sc-competing-title">Competing projects found</div>
@@ -211,7 +198,6 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
     </div>
   </nav>
 
-  <!-- RESEARCH PAGE -->
   <div class="page active" id="page-research">
     <div class="hero">
       <h1>Know the landscape<br><span>before you build.</span></h1>
@@ -221,17 +207,12 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
     <div class="form-card">
       <div class="section-label">01 — API Keys</div>
       <div class="notice"><strong>Your keys are never stored.</strong> Used only for this request then discarded. Each run costs ~$0.04 from your Anthropic balance.</div>
-
       <div class="form-grid single gap">
         <div class="field">
-          <label>
-            Anthropic API Key
-            <button class="help-btn" onclick="openHelp()" title="How to get an Anthropic API key">?</button>
-          </label>
+          <label>Anthropic API Key <button class="help-btn" onclick="openHelp()" title="How to get an Anthropic API key">?</button></label>
           <input type="password" id="anthropic-key" placeholder="sk-ant-api03-..." autocomplete="off">
         </div>
       </div>
-
       <div class="form-grid single gap">
         <div class="field">
           <label>Colosseum Copilot PAT</label>
@@ -270,7 +251,6 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
     </div>
   </div>
 
-  <!-- LEADERBOARD PAGE -->
   <div class="page" id="page-leaderboard">
     <div class="lb-header"><div><div class="lb-title">Leaderboard</div><div class="lb-count" id="lb-count">Loading...</div></div></div>
     <div class="lb-filters">
@@ -305,45 +285,35 @@ const SUPABASE_KEY = 'sb_publishable_nFYzqUIuJ4fNxpSDDnsZRw_Ax6_Vy8P';
 let currentResult = null, allScores = [], currentFilter = 'all', statusInterval = null;
 
 const STATUSES = [
-  'Connecting to Colosseum Copilot...',
-  'Searching hackathon clusters...',
-  'Cross-referencing archives...',
-  'Analyzing competitive landscape...',
-  'Checking accelerator overlap...',
-  'Generating scorecard...',
+  'Connecting to Colosseum Copilot...','Searching hackathon clusters...',
+  'Cross-referencing archives...','Analyzing competitive landscape...',
+  'Checking accelerator overlap...','Generating scorecard...',
 ];
 
-// ── MODALS ───────────────────────────────────────────
-function openHelp() {
-  document.getElementById('modal-help-overlay').classList.add('visible');
-}
-function closeHelpBtn() {
-  document.getElementById('modal-help-overlay').classList.remove('visible');
-}
-function closeHelp(e) {
-  if (e.target === document.getElementById('modal-help-overlay')) closeHelpBtn();
-}
+const DIMS = [
+  { key: 'novelty',             label: 'Novelty' },
+  { key: 'market_timing',       label: 'Market Timing' },
+  { key: 'competitive_gap',     label: 'Competitive Gap' },
+  { key: 'mechanism_design',    label: 'Mechanism Design' },
+  { key: 'accelerator_overlap', label: 'Accelerator Overlap' },
+  { key: 'hackathon_precedent', label: 'Hackathon Precedent' },
+  { key: 'archive_backing',     label: 'Archive Backing' },
+  { key: 'builder_density',     label: 'Builder Density' },
+];
 
-function openScorecardModal() {
-  document.getElementById('modal-scorecard-overlay').classList.add('visible');
-}
-function closeScorecardModal(e) {
-  if (e.target === document.getElementById('modal-scorecard-overlay')) closeScorecardAndClear();
-}
+function openHelp() { document.getElementById('modal-help-overlay').classList.add('visible'); }
+function closeHelpBtn() { document.getElementById('modal-help-overlay').classList.remove('visible'); }
+function closeHelp(e) { if (e.target === document.getElementById('modal-help-overlay')) closeHelpBtn(); }
+
+function openScorecardModal() { document.getElementById('modal-scorecard-overlay').classList.add('visible'); }
+function closeScorecardModal(e) { if (e.target === document.getElementById('modal-scorecard-overlay')) closeScorecardAndClear(); }
 function closeScorecardAndClear() {
   document.getElementById('modal-scorecard-overlay').classList.remove('visible');
-  // Clear all form inputs
-  document.getElementById('anthropic-key').value = '';
-  document.getElementById('colosseum-pat').value = '';
-  document.getElementById('proj-name').value = '';
-  document.getElementById('x-link').value = '';
+  ['anthropic-key','colosseum-pat','proj-name','x-link','country','description'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('category').value = '';
-  document.getElementById('country').value = '';
-  document.getElementById('description').value = '';
   currentResult = null;
 }
 
-// ── NAV ─────────────────────────────────────────────
 function showPage(name, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -352,45 +322,27 @@ function showPage(name, btn) {
   if (name === 'leaderboard') loadLeaderboard();
 }
 
-// ── TOAST ────────────────────────────────────────────
 function toast(msg, type = '') {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + type;
+  t.textContent = msg; t.className = 'toast show ' + type;
   setTimeout(() => t.className = 'toast', 3500);
 }
 
-// ── STATUS ───────────────────────────────────────────
 function startStatus() {
   let i = 0;
   document.getElementById('status-text').textContent = STATUSES[0];
   document.getElementById('status-bar').classList.add('visible');
-  statusInterval = setInterval(() => {
-    i = (i + 1) % STATUSES.length;
-    document.getElementById('status-text').textContent = STATUSES[i];
-  }, 8000);
+  statusInterval = setInterval(() => { i = (i+1) % STATUSES.length; document.getElementById('status-text').textContent = STATUSES[i]; }, 8000);
 }
-function stopStatus() {
-  clearInterval(statusInterval);
-  document.getElementById('status-bar').classList.remove('visible');
-}
+function stopStatus() { clearInterval(statusInterval); document.getElementById('status-bar').classList.remove('visible'); }
 
-// ── SCORE HELPERS ────────────────────────────────────
 function scoreClass(s) { return s >= 7 ? 'high' : s >= 5 ? 'mid' : 'low'; }
 function scoreColor(s) { return s >= 7 ? '#00e5a0' : s >= 5 ? '#f5c542' : '#e05c5c'; }
 
-const DIMS = [
-  { key: 'novelty', label: 'Novelty' },
-  { key: 'market_timing', label: 'Market Timing' },
-  { key: 'competitive_gap', label: 'Competitive Gap' },
-  { key: 'mechanism_design', label: 'Mechanism Design' },
-  { key: 'accelerator_overlap', label: 'Accelerator Overlap' },
-  { key: 'hackathon_precedent', label: 'Hackathon Precedent' },
-  { key: 'archive_backing', label: 'Archive Backing' },
-  { key: 'builder_density', label: 'Builder Density' },
-];
+function toggleDim(el) {
+  el.closest('.dim-item').classList.toggle('open');
+}
 
-// ── RESEARCH ─────────────────────────────────────────
 async function runResearch() {
   const aKey    = document.getElementById('anthropic-key').value.trim();
   const cPat    = document.getElementById('colosseum-pat').value.trim();
@@ -400,12 +352,12 @@ async function runResearch() {
   const country = document.getElementById('country').value.trim();
   const desc    = document.getElementById('description').value.trim();
 
-  if (!aKey)                    return toast('Anthropic API key is required', 'error');
+  if (!aKey) return toast('Anthropic API key is required', 'error');
   if (!aKey.startsWith('sk-ant-')) return toast('Invalid Anthropic key — should start with sk-ant-', 'error');
-  if (!cPat)                    return toast('Colosseum Copilot PAT is required', 'error');
-  if (!name)                    return toast('Project name is required', 'error');
-  if (!cat)                     return toast('Please select a category', 'error');
-  if (!country)                 return toast('Country is required', 'error');
+  if (!cPat) return toast('Colosseum Copilot PAT is required', 'error');
+  if (!name) return toast('Project name is required', 'error');
+  if (!cat) return toast('Please select a category', 'error');
+  if (!country) return toast('Country is required', 'error');
   if (!desc || desc.length < 30) return toast('Please add a more detailed description', 'error');
 
   const btn = document.getElementById('btn-run');
@@ -432,18 +384,29 @@ async function runResearch() {
   }
 }
 
-// ── RENDER SCORECARD ──────────────────────────────────
 function renderScorecard(r) {
   document.getElementById('sc-proj-name').textContent = r.project_name;
   document.getElementById('sc-meta').textContent = `${r.category} · ${r.country}`;
   document.getElementById('sc-score').textContent = Number(r.score).toFixed(2);
   document.getElementById('sc-summary').textContent = r.summary;
 
-  const grid = document.getElementById('dims-grid');
-  grid.innerHTML = '';
+  const list = document.getElementById('dims-list');
+  list.innerHTML = '';
   DIMS.forEach(d => {
-    const val = r[d.key], color = scoreColor(val), pct = (val / 10) * 100;
-    grid.innerHTML += `<div class="dim-row"><span class="dim-name">${d.label}</span><div style="display:flex;align-items:center;gap:8px"><div style="width:48px;height:3px;background:#1e1e1e;border-radius:2px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px"></div></div><span class="dim-val ${scoreClass(val)}">${val}</span></div></div>`;
+    const val = r[d.key];
+    const color = scoreColor(val);
+    const pct = (val / 10) * 100;
+    const insight = r[d.key + '_insight'] || '';
+    list.innerHTML += `
+      <div class="dim-item">
+        <div class="dim-header" onclick="toggleDim(this)">
+          <span class="dim-name">${d.label}</span>
+          <div class="dim-bar-wrap"><div class="dim-bar" style="width:${pct}%;background:${color}"></div></div>
+          <span class="dim-val ${scoreClass(val)}">${val}</span>
+          <span class="dim-arrow">▼</span>
+        </div>
+        ${insight ? `<div class="dim-insight">${insight}</div>` : ''}
+      </div>`;
   });
 
   if (r.top_competing_projects && r.top_competing_projects.length) {
@@ -457,7 +420,6 @@ function renderScorecard(r) {
   document.getElementById('btn-submit').textContent = 'Submit to Leaderboard →';
 }
 
-// ── EXPORT ────────────────────────────────────────────
 async function exportImage() {
   if (!currentResult) return;
   toast('Generating image...', '');
@@ -465,14 +427,13 @@ async function exportImage() {
     const el = document.querySelector('.modal-scorecard-inner');
     const canvas = await html2canvas(el, { backgroundColor: '#0f0f0f', scale: 2, logging: false });
     const link = document.createElement('a');
-    link.download = `${currentResult.project_name.replace(/\s+/g, '-')}-scorecard.png`;
+    link.download = `${currentResult.project_name.replace(/\s+/g,'-')}-scorecard.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
     toast('Image saved!', 'success');
   } catch { toast('Export failed', 'error'); }
 }
 
-// ── SUBMIT LEADERBOARD ────────────────────────────────
 async function submitToLeaderboard() {
   if (!currentResult) return;
   const btn = document.getElementById('btn-submit');
@@ -500,7 +461,6 @@ async function submitToLeaderboard() {
   }
 }
 
-// ── LEADERBOARD ───────────────────────────────────────
 async function loadLeaderboard() {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/scores?select=*&order=score.desc&limit=100`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
@@ -519,17 +479,17 @@ function renderLeaderboard() {
   const filtered = currentFilter === 'all' ? allScores : allScores.filter(s => s.category === currentFilter);
   document.getElementById('lb-count').textContent = `${filtered.length} project${filtered.length !== 1 ? 's' : ''}`;
   const tbody = document.getElementById('lb-body');
-  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div>○</div>No submissions yet — be the first!</div></td></tr>'; return; }
-  const medals = ['⬡', '◈', '◇'];
-  tbody.innerHTML = filtered.map((s, i) => {
-    const rank = i + 1;
-    const xHtml = s.x_link ? `<div class="proj-x"><a href="${s.x_link}" target="_blank">${s.x_link.replace('https://x.com/', '@').replace('https://twitter.com/', '@')}</a></div>` : '';
-    return `<tr><td class="${rank <= 3 ? 'rank top' : 'rank'}">${rank <= 3 ? medals[i] : rank}</td><td><div class="proj-name">${s.project_name}</div>${xHtml}</td><td><span class="cat-badge">${s.category}</span></td><td>${flag(s.country)}</td><td class="score-cell ${scoreClass(s.score)}">${Number(s.score).toFixed(2)}</td></tr>`;
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div>○</div>No submissions yet</div></td></tr>'; return; }
+  const medals = ['⬡','◈','◇'];
+  tbody.innerHTML = filtered.map((s,i) => {
+    const rank = i+1;
+    const xHtml = s.x_link ? `<div class="proj-x"><a href="${s.x_link}" target="_blank">${s.x_link.replace('https://x.com/','@').replace('https://twitter.com/','@')}</a></div>` : '';
+    return `<tr><td class="${rank<=3?'rank top':'rank'}">${rank<=3?medals[i]:rank}</td><td><div class="proj-name">${s.project_name}</div>${xHtml}</td><td><span class="cat-badge">${s.category}</span></td><td>${flag(s.country)}</td><td class="score-cell ${scoreClass(s.score)}">${Number(s.score).toFixed(2)}</td></tr>`;
   }).join('');
 }
 
 function flag(c) {
-  const m = { ukraine:'🇺🇦',usa:'🇺🇸','united states':'🇺🇸',uk:'🇬🇧','united kingdom':'🇬🇧',germany:'🇩🇪',france:'🇫🇷',india:'🇮🇳',china:'🇨🇳',japan:'🇯🇵',korea:'🇰🇷',brazil:'🇧🇷',canada:'🇨🇦',australia:'🇦🇺',singapore:'🇸🇬',netherlands:'🇳🇱',switzerland:'🇨🇭',spain:'🇪🇸',italy:'🇮🇹',poland:'🇵🇱',nigeria:'🇳🇬',argentina:'🇦🇷',mexico:'🇲🇽',turkey:'🇹🇷',portugal:'🇵🇹',sweden:'🇸🇪' };
+  const m = {ukraine:'🇺🇦',usa:'🇺🇸','united states':'🇺🇸',uk:'🇬🇧','united kingdom':'🇬🇧',germany:'🇩🇪',france:'🇫🇷',india:'🇮🇳',china:'🇨🇳',japan:'🇯🇵',korea:'🇰🇷',brazil:'🇧🇷',canada:'🇨🇦',australia:'🇦🇺',singapore:'🇸🇬',netherlands:'🇳🇱',switzerland:'🇨🇭',spain:'🇪🇸',italy:'🇮🇹',poland:'🇵🇱',nigeria:'🇳🇬',argentina:'🇦🇷',mexico:'🇲🇽',turkey:'🇹🇷',portugal:'🇵🇹',sweden:'🇸🇪'};
   return m[c?.toLowerCase()] || c;
 }
 </script>
