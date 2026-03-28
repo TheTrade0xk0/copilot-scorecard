@@ -436,8 +436,8 @@ app.get('/share/:filename', (req, res) => {
   <meta property="og:description" content="Project idea scored by Arena Research, powered by Colosseum Copilot + Anthropic">
   <meta property="og:image" content="${imageUrl}">
   <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="1240">
-  <meta property="og:image:height" content="620">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="628">
   <meta property="og:url" content="${req.protocol}://${req.get('host')}/share/${filename}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@backyard_fi">
