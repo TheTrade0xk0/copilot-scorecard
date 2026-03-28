@@ -46,7 +46,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0
 .note a{color:var(--green);text-decoration:none;}
 .notice{background:var(--surface2);border:1px solid var(--border2);border-left:2px solid var(--green);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.6;}
 .notice strong{color:var(--text);}
-.help-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--border2);border:1px solid var(--border2);color:var(--muted);font-size:10px;font-family:var(--font-mono);cursor:pointer;transition:all .2s;flex-shrink:0;line-height:1;}
+.help-btn{display:inline-flex;align-items:center;justify-content:center;height:16px;padding:0 6px;border-radius:4px;background:var(--border2);border:1px solid var(--border2);color:var(--muted);font-size:9px;font-family:var(--font-mono);cursor:pointer;transition:all .2s;flex-shrink:0;line-height:1;letter-spacing:.04em;white-space:nowrap;}
 .help-btn:hover{background:var(--green);color:#000;border-color:var(--green);}
 
 .status-bar{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:16px;font-family:var(--font-mono);font-size:12px;color:var(--green);display:none;align-items:center;gap:10px;}
@@ -182,16 +182,31 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
 </head>
 <body>
 
-<!-- HELP MODAL -->
+<!-- HELP MODAL - Anthropic -->
 <div class="modal-overlay" id="modal-help-overlay" onclick="closeHelp(event)">
   <div class="modal-help">
     <button class="modal-close" onclick="closeHelpBtn()">✕</button>
-    <h2>How to get an <span>Anthropic API Key</span></h2>
+    <h2>How to find your <span>Anthropic API Key</span></h2>
     <div class="modal-step"><div class="modal-step-num">1</div><div class="modal-step-body">Go to <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> and sign up or log in.</div></div>
     <div class="modal-step"><div class="modal-step-num">2</div><div class="modal-step-body">In the left sidebar, click <strong>API Keys</strong>.</div></div>
-    <div class="modal-step"><div class="modal-step-num">3</div><div class="modal-step-body">Click <strong>Create Key</strong>, give it a name, and copy the key. It starts with <code>sk-ant-</code>.</div></div>
-    <div class="modal-step"><div class="modal-step-num">4</div><div class="modal-step-body">Add a payment method under <strong>Billing</strong>. New accounts get <strong>$5 free credits</strong> — enough for ~125 research runs.</div></div>
-    <div class="modal-step"><div class="modal-step-num">5</div><div class="modal-step-body">Paste the key into the field above. <strong>It is never stored</strong> — used only for your request.</div></div>
+    <div class="modal-step"><div class="modal-step-num">3</div><div class="modal-step-body">Click <strong>Create Key</strong>, give it a name, and copy it. It starts with <code>sk-ant-</code>.</div></div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <a href="https://console.anthropic.com/settings/keys" target="_blank" style="display:inline-block;background:var(--green);color:#000;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;border-radius:6px;text-decoration:none;">Open Anthropic Console ↗</a>
+    </div>
+  </div>
+</div>
+
+<!-- HELP MODAL - Colosseum PAT -->
+<div class="modal-overlay" id="modal-pat-overlay" onclick="closePatHelp(event)">
+  <div class="modal-help">
+    <button class="modal-close" onclick="closePatHelpBtn()">✕</button>
+    <h2>How to find your <span>Colosseum PAT</span></h2>
+    <div class="modal-step"><div class="modal-step-num">1</div><div class="modal-step-body">Go to <a href="https://arena.colosseum.org/copilot" target="_blank">arena.colosseum.org/copilot</a> and sign in.</div></div>
+    <div class="modal-step"><div class="modal-step-num">2</div><div class="modal-step-body">Click <strong>Step 1</strong> to generate your Personal Access Token.</div></div>
+    <div class="modal-step"><div class="modal-step-num">3</div><div class="modal-step-body">Copy the token and paste it into the field. It starts with <code>eyJ</code>.</div></div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <a href="https://arena.colosseum.org/copilot" target="_blank" style="display:inline-block;background:var(--green);color:#000;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;border-radius:6px;text-decoration:none;">Open Colosseum Copilot ↗</a>
+    </div>
   </div>
 </div>
 
@@ -238,32 +253,33 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
 <div class="wrap">
   <nav>
     <div class="nav-logo">⬡ Arena Research</div>
-    <div class="nav-tabs">
-      <button class="nav-tab active" onclick="showPage('research',this)">Research</button>
-      <button class="nav-tab" onclick="showPage('leaderboard',this)">Leaderboard</button>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a href="https://arena.colosseum.org" target="_blank" style="font-family:var(--font-mono);font-size:11px;color:var(--green);text-decoration:none;border:1px solid var(--green);padding:6px 14px;border-radius:6px;letter-spacing:.06em;transition:background .2s;" onmouseover="this.style.background='#00e5a015'" onmouseout="this.style.background='none'">Apply to Colosseum ↗</a>
+      <div class="nav-tabs">
+        <button class="nav-tab active" onclick="showPage('research',this)">Research</button>
+        <button class="nav-tab" onclick="showPage('leaderboard',this)">Leaderboard</button>
+      </div>
     </div>
   </nav>
 
   <div class="page active" id="page-research">
     <div class="hero">
-      <h1>Know the landscape<br><span>before you build.</span></h1>
+      <h1 style="font-size:clamp(24px,4vw,38px);">Know the landscape<br><span>before you build.</span></h1>
       <p>Pressure-test your idea against 5,400+ hackathon projects, 65+ curated sources, and 6,300+ crypto products.</p>
     </div>
 
     <div class="form-card">
       <div class="section-label">01 — API Keys</div>
-      <div class="notice"><strong>Your keys are never stored.</strong> Used only for this request then discarded. Each run costs ~$0.04 from your Anthropic balance.</div>
       <div class="form-grid single gap">
         <div class="field">
-          <label>Anthropic API Key <button class="help-btn" onclick="openHelp()" title="How to get an Anthropic API key">?</button></label>
+          <label>Anthropic API Key <button class="help-btn" onclick="openHelp()" title="Your keys are never stored. Used only for this request then discarded. Each run costs ~$0.04 from your Anthropic balance.">How to find?</button></label>
           <input type="password" id="anthropic-key" placeholder="sk-ant-api03-..." autocomplete="off">
         </div>
       </div>
       <div class="form-grid single gap">
         <div class="field">
-          <label>Colosseum Copilot PAT</label>
+          <label>Colosseum Copilot PAT <button class="help-btn" onclick="openPatHelp()" title="Get your token from Colosseum Copilot">How to find?</button></label>
           <input type="password" id="colosseum-pat" placeholder="eyJhbGci..." autocomplete="off">
-          <div class="note">Get your token at <a href="https://copilot.colosseum.com" target="_blank">copilot.colosseum.com</a> → Step 1</div>
         </div>
       </div>
 
@@ -281,7 +297,22 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
             <option>Climate</option><option>Payments</option>
           </select>
         </div>
-        <div class="field"><label>Country</label><input type="text" id="country" placeholder="e.g. Ukraine"></div>
+        <div class="field">
+          <label>Country</label>
+          <select id="country-select" onchange="handleCountrySelect(this.value)" style="margin-bottom:6px;">
+            <option value="">Select country...</option>
+            <option>Ukraine</option><option>United States</option><option>United Kingdom</option>
+            <option>Germany</option><option>France</option><option>India</option>
+            <option>China</option><option>Japan</option><option>Korea</option>
+            <option>Brazil</option><option>Canada</option><option>Australia</option>
+            <option>Singapore</option><option>Netherlands</option><option>Switzerland</option>
+            <option>Spain</option><option>Italy</option><option>Poland</option>
+            <option>Nigeria</option><option>Argentina</option><option>Mexico</option>
+            <option>Turkey</option><option>Portugal</option><option>Sweden</option>
+            <option value="other">Other (type below)</option>
+          </select>
+          <input type="text" id="country" placeholder="Or type your country..." style="display:none;">
+        </div>
       </div>
 
       <div class="section-label">03 — Project Description</div>
@@ -445,12 +476,37 @@ function openHelp() { document.getElementById('modal-help-overlay').classList.ad
 function closeHelpBtn() { document.getElementById('modal-help-overlay').classList.remove('visible'); }
 function closeHelp(e) { if (e.target === document.getElementById('modal-help-overlay')) closeHelpBtn(); }
 
+function openPatHelp() { document.getElementById('modal-pat-overlay').classList.add('visible'); }
+function closePatHelpBtn() { document.getElementById('modal-pat-overlay').classList.remove('visible'); }
+function closePatHelp(e) { if (e.target === document.getElementById('modal-pat-overlay')) closePatHelpBtn(); }
+
+function handleCountrySelect(val) {
+  const input = document.getElementById('country');
+  if (val === 'other') {
+    input.style.display = 'block';
+    input.value = '';
+    input.focus();
+  } else {
+    input.style.display = 'none';
+    input.value = val;
+  }
+}
+
+function getCountry() {
+  const sel = document.getElementById('country-select').value;
+  const inp = document.getElementById('country').value.trim();
+  if (sel === 'other') return inp;
+  return sel || inp;
+}
+
 function openScorecardModal() { document.getElementById('modal-scorecard-overlay').classList.add('visible'); }
 function closeScorecardModal(e) { if (e.target === document.getElementById('modal-scorecard-overlay')) closeScorecardAndClear(); }
 function closeScorecardAndClear() {
   document.getElementById('modal-scorecard-overlay').classList.remove('visible');
   ['anthropic-key','colosseum-pat','proj-name','x-link','country','description'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('category').value = '';
+  document.getElementById('country-select').value = '';
+  document.getElementById('country').style.display = 'none';
   currentResult = null;
 }
 
@@ -489,7 +545,7 @@ async function runResearch() {
   const name    = document.getElementById('proj-name').value.trim();
   const xlink   = document.getElementById('x-link').value.trim();
   const cat     = document.getElementById('category').value;
-  const country = document.getElementById('country').value.trim();
+  const country = getCountry();
   const desc    = document.getElementById('description').value.trim();
 
   if (!aKey) return toast('Anthropic API key is required', 'error');
@@ -630,11 +686,12 @@ function renderLeaderboard() {
   document.getElementById('lb-count').textContent = `${filtered.length} project${filtered.length !== 1 ? 's' : ''}`;
   const tbody = document.getElementById('lb-body');
   if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div>○</div>No submissions yet</div></td></tr>'; return; }
-  const medals = ['⬡','◈','◇'];
+  const medals = ['🥇','🥈','🥉'];
   tbody.innerHTML = filtered.map((s,i) => {
     const rank = i+1;
+    const rankDisplay = rank <= 3 ? medals[i] : rank;
     const xHtml = s.x_link ? `<div class="proj-x"><a href="${s.x_link}" target="_blank">${s.x_link.replace('https://x.com/','@').replace('https://twitter.com/','@')}</a></div>` : '';
-    return `<tr><td class="${rank<=3?'rank top':'rank'}">${rank<=3?medals[i]:rank}</td><td><div class="proj-name">${s.project_name}</div>${xHtml}</td><td><span class="cat-badge">${s.category}</span></td><td>${flag(s.country)}</td><td class="score-cell ${scoreClass(s.score)}">${Number(s.score).toFixed(2)}</td></tr>`;
+    return `<tr><td class="${rank<=3?'rank top':'rank'}">${rankDisplay}</td><td><div class="proj-name">${s.project_name}</div>${xHtml}</td><td><span class="cat-badge">${s.category}</span></td><td>${flag(s.country)}</td><td class="score-cell ${scoreClass(s.score)}">${Number(s.score).toFixed(2)}</td></tr>`;
   }).join('');
 }
 
