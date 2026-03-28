@@ -193,6 +193,9 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
       <a href="https://console.anthropic.com/settings/keys" target="_blank" style="display:inline-block;background:var(--green);color:#000;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;border-radius:6px;text-decoration:none;">Open Anthropic Console ↗</a>
     </div>
+    <div style="margin-top:12px;background:var(--surface2);border:1px solid var(--border2);border-left:2px solid var(--green);border-radius:6px;padding:10px 14px;font-size:11px;color:var(--muted);line-height:1.6;">
+      🔒 <strong style="color:var(--text)">Your key is never stored.</strong> It's sent directly to Anthropic for a single request and immediately discarded. We have no access to it after the request completes.
+    </div>
   </div>
 </div>
 
@@ -348,7 +351,10 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
 
   <footer>
     <div class="footer-l">Powered by Colosseum Copilot + Anthropic</div>
-    <div class="footer-r"><a href="https://copilot.colosseum.com" target="_blank">copilot.colosseum.com ↗</a></div>
+    <div style="display:flex;align-items:center;gap:20px;">
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2);">Created by <a href="https://backyard.finance" target="_blank" style="color:var(--muted);text-decoration:none;">backyard.finance</a></span>
+      <div class="footer-r"><a href="https://copilot.colosseum.com" target="_blank">copilot.colosseum.com ↗</a></div>
+    </div>
   </footer>
 </div>
 
