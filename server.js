@@ -5,7 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const COPILOT_BASE = 'https://copilot.colosseum.com/api/v1';
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-colosseum-pat'] }));
 app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => { res.setTimeout(120000); next(); });
 
