@@ -51,28 +51,33 @@ async function callClaude(apiKey, messages, systemPrompt) {
   return data.content[0].text;
 }
 
+// Trim to essential fields only to manage token count
 function trimProject(p) {
   return {
     name: p.name || p.title,
     slug: p.slug,
-    description: (p.description || p.summary || '').slice(0, 150),
+    description: (p.description || p.summary || '').slice(0, 120),
     hackathon: p.hackathon?.slug || p.hackathon,
-    tags: p.tags?.slice(0, 5),
-    score: p.score || p.similarity,
+    tags: (p.tags || []).slice(0, 4),
+    similarity: p.score || p.similarity,
   };
 }
 
 function trimArchive(a) {
   return {
     title: a.title,
-    summary: (a.summary || a.content || '').slice(0, 200),
+    summary: (a.summary || a.content || '').slice(0, 150),
     source: a.source || a.url,
     date: a.date || a.publishedAt,
   };
 }
 
+function settled(r) {
+  return r.status === 'fulfilled' ? (r.value?.results || r.value || []) : [];
+}
+
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', mode: 'direct-api-v2' });
+  res.json({ status: 'ok', mode: 'deep-research-v1' });
 });
 
 app.post('/research', async (req, res) => {
@@ -88,62 +93,124 @@ app.post('/research', async (req, res) => {
   const pat = user_pat || process.env.COLOSSEUM_COPILOT_PAT;
   if (!pat) return res.status(500).json({ error: 'Colosseum PAT missing' });
 
-  console.log(`[research] Starting: ${project_name}`);
+  console.log(`[research] Starting deep research: ${project_name}`);
 
   try {
+    // STEP 1 — Auth preflight (required per SKILL.md)
     await copilotGet('status', pat);
+    console.log(`[research] Step 1: Auth OK`);
 
-    const query = `${project_name} ${description}`;
+    // Full query = project name + full description (no truncation)
+    const fullQuery = `${project_name} ${description}`;
+    const categoryQuery = `${category} ${description}`;
+    const nameQuery = project_name;
 
+    // STEP 2 — Parallel searches following SKILL.md deep research workflow:
+    // - search/projects: general, acceleratorOnly, winnersOnly, by name
+    // - search/archives: by full description, by category
+    // - /filters: hackathon chronology
+    // - /analyze: hackathon distribution for this category
     const [
-      projectsGeneral,
-      projectsAccelerator,
-      projectsWinners,
-      archivesGeneral,
-      archivesCategory,
+      // Step 2a: Similar projects (general semantic search — full description)
+      s1_projects_general,
+      // Step 2b: Accelerator portfolio overlap (SKILL.md: required for evaluative queries)
+      s2_projects_accelerator,
+      // Step 2c: Hackathon winners only (precedent check)
+      s3_projects_winners,
+      // Step 2d: Search by project name alone (entity coverage check per SKILL.md)
+      s4_projects_by_name,
+      // Step 2e: Archives — general (required per SKILL.md archive integration rule)
+      s5_archives_general,
+      // Step 2f: Archives — by category (conceptual framing)
+      s6_archives_category,
+      // Step 2g: Hackathon chronology + available filters
+      s7_filters,
+      // Step 2h: Analyze hackathon distribution for this category
+      s8_analyze,
     ] = await Promise.allSettled([
-      copilotPost('search/projects', pat, { query, limit: 15 }),
-      copilotPost('search/projects', pat, { query, limit: 8, filters: { acceleratorOnly: true } }),
-      copilotPost('search/projects', pat, { query, limit: 8, filters: { winnersOnly: true } }),
-      copilotPost('search/archives', pat, { query, limit: 8 }),
-      copilotPost('search/archives', pat, { query: `${category} ${project_name}`, limit: 5 }),
+      copilotPost('search/projects', pat, { query: fullQuery, limit: 15 }),
+      copilotPost('search/projects', pat, { query: fullQuery, limit: 10, filters: { acceleratorOnly: true } }),
+      copilotPost('search/projects', pat, { query: fullQuery, limit: 10, filters: { winnersOnly: true } }),
+      copilotPost('search/projects', pat, { query: nameQuery, limit: 5 }),
+      copilotPost('search/archives', pat, { query: fullQuery, limit: 8 }),
+      copilotPost('search/archives', pat, { query: categoryQuery, limit: 5 }),
+      copilotGet('filters', pat),
+      copilotPost('analyze', pat, { query: fullQuery, hackathon: 'all' }).catch(() => null),
     ]);
 
-    function getResults(settled) {
-      return settled.status === 'fulfilled' ? (settled.value?.results || []) : [];
+    // Extract and trim all results
+    const projects_general    = settled(s1_projects_general).map(trimProject);
+    const projects_accelerator= settled(s2_projects_accelerator).map(trimProject);
+    const projects_winners    = settled(s3_projects_winners).map(trimProject);
+    const projects_by_name    = settled(s4_projects_by_name).map(trimProject);
+    const archives_general    = settled(s5_archives_general).map(trimArchive);
+    const archives_category   = settled(s6_archives_category).map(trimArchive);
+    const filters             = s7_filters.status === 'fulfilled' ? s7_filters.value : null;
+    const analyze             = s8_analyze.status === 'fulfilled' ? s8_analyze.value : null;
+
+    // Deduplicate projects by slug
+    const allProjectSlugs = new Set();
+    function dedupe(arr) {
+      return arr.filter(p => {
+        if (!p.slug || allProjectSlugs.has(p.slug)) return true; // keep if no slug
+        allProjectSlugs.add(p.slug);
+        return true;
+      });
     }
 
-    const projects    = getResults(projectsGeneral).map(trimProject);
-    const accelerator = getResults(projectsAccelerator).map(trimProject);
-    const winners     = getResults(projectsWinners).map(trimProject);
-    const archives    = [...getResults(archivesGeneral), ...getResults(archivesCategory)]
-                         .slice(0, 10).map(trimArchive);
+    console.log(`[research] Step 2 complete: general=${projects_general.length} accelerator=${projects_accelerator.length} winners=${projects_winners.length} name=${projects_by_name.length} archives=${archives_general.length + archives_category.length}`);
 
-    console.log(`[research] Data: projects=${projects.length} accelerator=${accelerator.length} winners=${winners.length} archives=${archives.length}`);
+    // STEP 3 — Send all corpus data to Claude for scoring
+    const systemPrompt = `You are an expert Colosseum hackathon analyst. 
+You have received data from all 8 steps of the Colosseum Copilot deep research workflow.
+Analyze ALL the data carefully, then return ONLY a valid JSON scorecard.
+No markdown, no explanation, no text outside the JSON object.`;
 
-    const systemPrompt = `You are an expert crypto/Solana ecosystem analyst for Colosseum hackathons.
-Analyze the Colosseum Copilot corpus data and return ONLY a valid JSON scorecard. No markdown, no text outside the JSON.`;
+    const userMessage = `Deep research scorecard for this project:
 
-    const userMessage = `Score this project using Colosseum corpus data.
-
-PROJECT: ${project_name} | ${category} | ${country}
+PROJECT: ${project_name}
+CATEGORY: ${category}
+COUNTRY: ${country}
 DESCRIPTION: ${description}
 
-SIMILAR PROJECTS (${projects.length}):
-${JSON.stringify(projects)}
+══ STEP 1: SIMILAR PROJECTS — semantic search (${projects_general.length} results) ══
+${JSON.stringify(projects_general)}
 
-ACCELERATOR PORTFOLIO (${accelerator.length}):
-${JSON.stringify(accelerator)}
+══ STEP 2: ACCELERATOR PORTFOLIO — projects that won Colosseum accelerator (${projects_accelerator.length} results) ══
+${JSON.stringify(projects_accelerator)}
 
-HACKATHON WINNERS (${winners.length}):
-${JSON.stringify(winners)}
+══ STEP 3: HACKATHON WINNERS — prize winners across all editions (${projects_winners.length} results) ══
+${JSON.stringify(projects_winners)}
 
-ARCHIVE SOURCES (${archives.length}):
-${JSON.stringify(archives)}
+══ STEP 4: ENTITY SEARCH — projects matching the project name directly (${projects_by_name.length} results) ══
+${JSON.stringify(projects_by_name)}
+
+══ STEP 5: ARCHIVE SOURCES — curated crypto literature (${archives_general.length} results) ══
+${JSON.stringify(archives_general)}
+
+══ STEP 6: ARCHIVE SOURCES — category-specific (${archives_category.length} results) ══
+${JSON.stringify(archives_category)}
+
+══ STEP 7: HACKATHON CHRONOLOGY ══
+${JSON.stringify(filters?.hackathons || [])}
+
+══ STEP 8: HACKATHON ANALYSIS ══
+${JSON.stringify(analyze || 'Not available')}
+
+══ SCORING INSTRUCTIONS ══
+Score each 1-10 based strictly on corpus evidence above:
+- novelty: Uniqueness vs all similar projects found
+- market_timing: Archive evidence for current demand
+- competitive_gap: Room to win given all competing projects + accelerator overlap
+- mechanism_design: Sophistication vs similar projects in corpus
+- accelerator_overlap: How many accelerator projects are in the same space
+- hackathon_precedent: How many similar winners/projects exist in hackathon history
+- archive_backing: Strength of archive support for this thesis
+- builder_density: How crowded is the space (high density = lower score)
 
 Return ONLY this JSON:
 {
-  "score": <weighted average>,
+  "score": <weighted average of all 8 dimensions>,
   "novelty": <1-10>,
   "market_timing": <1-10>,
   "competitive_gap": <1-10>,
@@ -152,9 +219,9 @@ Return ONLY this JSON:
   "hackathon_precedent": <1-10>,
   "archive_backing": <1-10>,
   "builder_density": <1-10>,
-  "summary": "<3-4 sentences with specific project names/slugs and archive titles from data above>",
-  "top_competing_projects": ["<slug from data>", "<slug>", "<slug>"],
-  "key_sources": ["<archive title>", "<archive title>"]
+  "summary": "<3-4 sentences citing specific slugs and archive titles from the data>",
+  "top_competing_projects": ["<real slug from corpus>", "<real slug>", "<real slug>"],
+  "key_sources": ["<real archive title from corpus>", "<real archive title>"]
 }`;
 
     const claudeResponse = await callClaude(
@@ -192,6 +259,6 @@ Return ONLY this JSON:
 });
 
 app.listen(PORT, () => {
-  console.log(`[server] Running on port ${PORT}`);
+  console.log(`[server] Running on port ${PORT} — deep research mode`);
   console.log(`[server] PAT: ${process.env.COLOSSEUM_COPILOT_PAT ? '✓ set' : '✗ missing'}`);
 });
