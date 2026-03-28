@@ -358,7 +358,7 @@ const BACKEND_URL = 'https://copilot-scorecard-production.up.railway.app';
 const SUPABASE_URL = 'https://popeauzmykmmztjfekaa.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_nFYzqUIuJ4fNxpSDDnsZRw_Ax6_Vy8P';
 
-let currentResult = null, allScores = [], currentFilter = 'all', statusInterval = null;
+let currentResult = null, allScores = [], currentFilter = 'all', statusInterval = null, savedPat = '';
 
 const STATUSES = [
   'Connecting to Colosseum Copilot...','Searching hackathon clusters...',
@@ -433,7 +433,7 @@ function openProjectModal(slug) {
   content.innerHTML = '<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;">Loading...</div>';
   overlay.classList.add('visible');
 
-  const pat = document.getElementById('colosseum-pat').value.trim() || '';
+  const pat = savedPat || document.getElementById('colosseum-pat').value.trim() || '';
   fetch(`${BACKEND_URL}/project/${slug}?pat=${encodeURIComponent(pat)}`)
   .then(r => r.json())
   .then(data => {
@@ -545,6 +545,7 @@ function toggleDim(el) {
 async function runResearch() {
   const aKey    = document.getElementById('anthropic-key').value.trim();
   const cPat    = document.getElementById('colosseum-pat').value.trim();
+  savedPat = cPat;
   const name    = document.getElementById('proj-name').value.trim();
   const xlink   = document.getElementById('x-link').value.trim();
   const cat     = document.getElementById('category').value;
