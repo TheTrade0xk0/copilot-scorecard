@@ -37,7 +37,7 @@ async function callClaude(apiKey, messages, systemPrompt) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 3000,
       temperature: 0,
       system: systemPrompt,
       messages,
@@ -51,7 +51,6 @@ async function callClaude(apiKey, messages, systemPrompt) {
   return data.content[0].text;
 }
 
-// Extract 3-6 focused keywords for archive search (long queries dilute embeddings)
 function archiveKeywords(project_name, category, description) {
   const words = `${project_name} ${category} ${description}`
     .replace(/[^a-zA-Z0-9 ]/g, ' ')
@@ -62,7 +61,6 @@ function archiveKeywords(project_name, category, description) {
   return words;
 }
 
-// Route category to relevant hackathons per workflow-deep.md
 function hackathonsForCategory(category) {
   const map = {
     'Gaming': ['radar'],
@@ -124,45 +122,35 @@ app.post('/research', async (req, res) => {
   console.log(`[research] Starting: ${project_name}`);
 
   try {
-    // STEP 1 — Auth preflight
     await copilotGet('status', pat);
     console.log(`[research] Auth OK`);
 
-    // FIX 2: Two distinct project queries (semantic + problem-space rewrite)
     const semanticQuery = `${project_name} ${description}`;
     const problemQuery = `${category} problem ${description}`;
     const nameQuery = project_name;
-
-    // FIX 3: Archive keywords — 3-6 focused words, not full description
     const archiveKeywordsGeneral = archiveKeywords(project_name, category, description);
     const archiveKeywordsCategory = `${category} crypto Solana`;
-
-    // FIX 1: Correct hackathon routing for /analyze
     const hackathons = hackathonsForCategory(category);
 
-    // Run all searches in parallel
-    // Note: API allows 2 concurrent — server serializes overflow automatically
     const [
-      s1_projects_semantic,    // Query 1: semantic rewrite
-      s2_projects_problem,     // Query 2: problem-space rewrite (FIX 4)
-      s3_projects_accelerator, // Query 3: accelerator portfolio (REQUIRED)
-      s4_projects_winners,     // Winners check
-      s5_projects_by_name,     // Entity coverage check
-      s6_archives_general,     // FIX 3: focused keywords + maxChunksPerDoc
-      s7_archives_category,    // FIX 3: category-specific keywords
-      s8_filters,              // Hackathon chronology
-      s9_analyze,              // FIX 1: correct /analyze body
+      s1_projects_semantic,
+      s2_projects_problem,
+      s3_projects_accelerator,
+      s4_projects_winners,
+      s5_projects_by_name,
+      s6_archives_general,
+      s7_archives_category,
+      s8_filters,
+      s9_analyze,
     ] = await Promise.allSettled([
       copilotPost('search/projects', pat, { query: semanticQuery, limit: 12 }),
       copilotPost('search/projects', pat, { query: problemQuery, limit: 10 }),
       copilotPost('search/projects', pat, { query: semanticQuery, limit: 10, filters: { acceleratorOnly: true } }),
       copilotPost('search/projects', pat, { query: semanticQuery, limit: 8, filters: { winnersOnly: true } }),
       copilotPost('search/projects', pat, { query: nameQuery, limit: 5 }),
-      // FIX 3: maxChunksPerDoc: 1 for exploratory, focused keywords not full description
       copilotPost('search/archives', pat, { query: archiveKeywordsGeneral, limit: 5, maxChunksPerDoc: 1 }),
       copilotPost('search/archives', pat, { query: archiveKeywordsCategory, limit: 5, maxChunksPerDoc: 1 }),
       copilotGet('filters', pat),
-      // FIX 1: correct /analyze body with proper cohort + dimensions
       copilotPost('analyze', pat, {
         cohort: { hackathons, winnersOnly: false },
         dimensions: ['tracks', 'problemTags', 'techStack'],
@@ -184,8 +172,10 @@ app.post('/research', async (req, res) => {
     console.log(`[research] Data: semantic=${projects_semantic.length} problem=${projects_problem.length} accelerator=${projects_accelerator.length} winners=${projects_winners.length} archives=${archives_general.length + archives_category.length}`);
 
     const systemPrompt = `You are an expert Colosseum hackathon analyst.
-Analyze ALL provided corpus data carefully, then return ONLY a valid JSON scorecard.
-No markdown, no explanation, no text outside the JSON object.`;
+Analyze ALL provided corpus data carefully and produce a rigorous, evidence-based scorecard.
+Be critical and specific — cite actual project slugs and archive titles from the data.
+Scores must reflect real corpus evidence, not assumptions.
+Return ONLY valid JSON, no markdown, no text outside the JSON.`;
 
     const userMessage = `Score this project using Colosseum Copilot corpus data.
 
@@ -219,29 +209,35 @@ ${JSON.stringify(filters?.hackathons || [])}
 ── HACKATHON ANALYSIS ──
 ${JSON.stringify(analyze || 'Not available')}
 
-Score each 1-10 based strictly on the corpus data above:
-- novelty: Uniqueness vs all similar projects found
-- market_timing: Archive evidence for current demand
-- competitive_gap: Room to win given competing projects + accelerator overlap
-- mechanism_design: Sophistication vs similar projects
-- accelerator_overlap: How many accelerator projects in same space (high = lower score)
-- hackathon_precedent: Similar winners/projects in hackathon history (high = lower score)
-- archive_backing: Strength of archive support for this thesis
-- builder_density: How crowded the space is (high = lower score)
+SCORING RULES:
+- Be critical. If many similar projects exist, novelty and competitive_gap must be LOW.
+- accelerator_overlap: if accelerator projects match → score LOW (more competition)
+- hackathon_precedent: if many similar hackathon projects → score LOW (saturated)
+- builder_density: if space is crowded → score LOW
+- Each dimension_insight must cite specific slugs or archive titles from the data above.
+- Do NOT invent project names. Only cite what appears in the data.
 
-Return ONLY this JSON:
+Return ONLY this JSON (no markdown):
 {
   "score": <weighted average>,
   "novelty": <1-10>,
+  "novelty_insight": "<2-3 sentences citing specific project slugs that are similar or different. Be critical.>",
   "market_timing": <1-10>,
+  "market_timing_insight": "<2-3 sentences citing specific archive titles and what they say about demand.>",
   "competitive_gap": <1-10>,
+  "competitive_gap_insight": "<2-3 sentences naming the closest competing projects by slug and explaining the gap.>",
   "mechanism_design": <1-10>,
+  "mechanism_design_insight": "<2-3 sentences comparing mechanism sophistication to similar projects in corpus.>",
   "accelerator_overlap": <1-10>,
+  "accelerator_overlap_insight": "<2-3 sentences naming accelerator projects found and what that means.>",
   "hackathon_precedent": <1-10>,
+  "hackathon_precedent_insight": "<2-3 sentences citing winner slugs and hackathon editions where similar projects appeared.>",
   "archive_backing": <1-10>,
+  "archive_backing_insight": "<2-3 sentences citing specific archive document titles and what they validate.>",
   "builder_density": <1-10>,
-  "summary": "<3-4 sentences citing specific slugs and archive titles from the data above>",
-  "top_competing_projects": ["<real slug from corpus>", "<real slug>", "<real slug>"],
+  "builder_density_insight": "<2-3 sentences with specific counts from corpus data about how crowded this space is.>",
+  "summary": "<3-4 sentences overall assessment with specific evidence, naming real projects and sources.>",
+  "top_competing_projects": ["<real slug>", "<real slug>", "<real slug>"],
   "key_sources": ["<real archive title>", "<real archive title>"]
 }`;
 
