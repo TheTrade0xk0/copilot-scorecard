@@ -62,6 +62,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0
 /* MODALS */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s;}
 .modal-overlay.visible{opacity:1;pointer-events:all;}
+#modal-project-overlay{z-index:300;background:rgba(0,0,0,.92);}
 
 .modal-help{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:32px;max-width:520px;width:100%;position:relative;max-height:80vh;overflow-y:auto;}
 .modal-help h2{font-family:var(--font-display);font-size:22px;font-weight:800;margin-bottom:20px;letter-spacing:-.02em;}
@@ -414,12 +415,18 @@ function openProjectModal(slug) {
     const tags = Array.isArray(p.tags) ? p.tags : [];
     const hackathon = p.hackathon?.name || p.hackathon?.slug || p.hackathon || '—';
     const prize = p.prize ? `<span style="color:var(--green);margin-left:8px">🏆 ${p.prize}</span>` : '';
+    const colosseumUrl = `https://arena.colosseum.org/projects/${slug}`;
+    const xLink = p.links?.twitter || p.links?.x || null;
     content.innerHTML = `
       <div class="project-modal-title">${p.name || slug}</div>
       <div class="project-modal-meta">${hackathon}${prize}</div>
       <div class="project-modal-desc">${p.description || p.oneLiner || 'No description available.'}</div>
       ${tags.length ? `<div class="project-modal-tags">${tags.map(t => `<span class="project-modal-tag">${t}</span>`).join('')}</div>` : ''}
-      ${p.links?.website ? `<div style="margin-top:12px"><a href="${p.links.website}" target="_blank" style="color:var(--green);font-family:var(--font-mono);font-size:11px;">${p.links.website} ↗</a></div>` : ''}
+      <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;">
+        <a href="${colosseumUrl}" target="_blank" style="color:var(--green);font-family:var(--font-mono);font-size:11px;text-decoration:none;border:1px solid var(--green);padding:4px 10px;border-radius:6px;">View on Colosseum ↗</a>
+        ${xLink ? `<a href="${xLink}" target="_blank" style="color:var(--muted);font-family:var(--font-mono);font-size:11px;text-decoration:none;border:1px solid var(--border2);padding:4px 10px;border-radius:6px;">X / Twitter ↗</a>` : ''}
+        ${p.links?.website ? `<a href="${p.links.website}" target="_blank" style="color:var(--muted);font-family:var(--font-mono);font-size:11px;text-decoration:none;border:1px solid var(--border2);padding:4px 10px;border-radius:6px;">Website ↗</a>` : ''}
+      </div>
     `;
   })
   .catch(err => {
