@@ -19,8 +19,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .wrap{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:0 24px;}
 
 nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid var(--border);}
-.nav-logo{font-family:var(--font-mono);font-size:12px;color:var(--green);letter-spacing:.12em;text-transform:uppercase;}
-.nav-logo::before{content:'○';display:inline-block;margin-right:6px;animation:pulse 2s ease-in-out infinite;}
+.nav-logo{font-family:var(--font-display);font-size:16px;color:var(--green);letter-spacing:.08em;text-transform:uppercase;font-weight:800;}
+.nav-logo::before{content:'○';display:inline-block;margin-right:8px;font-size:10px;animation:pulse 2s ease-in-out infinite;}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(.8);}}
 .nav-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;}
 .nav-tab{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;padding:6px 14px;border-radius:5px;cursor:pointer;color:var(--muted);transition:all .2s;border:none;background:none;}
@@ -257,7 +257,7 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
 
 <div class="wrap">
   <nav>
-    <div class="nav-logo">Arena Research</div>
+    <div class="nav-logo" onclick="window.location.reload()" style="cursor:pointer;font-weight:700;letter-spacing:.08em;"><span style="color:var(--text)">Arena</span> <span style="color:var(--green)">Research</span></div>
     <div style="display:flex;align-items:center;gap:12px;">
       <a href="https://arena.colosseum.org" target="_blank" style="font-family:var(--font-mono);font-size:11px;color:var(--green);text-decoration:none;border:1px solid var(--green);padding:6px 14px;border-radius:6px;letter-spacing:.06em;transition:background .2s;" onmouseover="this.style.background='#00e5a015'" onmouseout="this.style.background='none'">Apply to Colosseum ↗</a>
       <div class="nav-tabs">
