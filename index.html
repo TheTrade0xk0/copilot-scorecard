@@ -542,21 +542,21 @@ function renderScorecard(r) {
       </div>`;
   });
 
+  document.getElementById('sc-competing').style.display = 'block';
+  document.getElementById('dive-section').style.display = 'block';
+  document.getElementById('dive-body').classList.remove('visible');
+  document.getElementById('btn-dive').textContent = 'Run Analysis →';
+  document.getElementById('btn-dive').disabled = false;
+
   if (r.top_competing_projects && r.top_competing_projects.length) {
-    document.getElementById('sc-competing').style.display = 'block';
     document.getElementById('sc-competing-list').innerHTML = r.top_competing_projects.map(p =>
       `<span class="sc-competing-tag">
         ${p}
         <button class="info-btn" onclick="openProjectModal('${p}')" title="View project details">ⓘ</button>
       </span>`
     ).join('');
-    document.getElementById('dive-section').style.display = 'block';
-    document.getElementById('dive-body').classList.remove('visible');
-    document.getElementById('btn-dive').textContent = 'Run Analysis →';
-    document.getElementById('btn-dive').disabled = false;
   } else {
-    document.getElementById('sc-competing').style.display = 'none';
-    document.getElementById('dive-section').style.display = 'none';
+    document.getElementById('sc-competing-list').innerHTML = '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2)">No direct competitors found in corpus</span>';
   }
 
   document.getElementById('btn-submit').disabled = false;
