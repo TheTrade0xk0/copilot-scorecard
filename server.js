@@ -5,7 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const COPILOT_BASE = 'https://copilot.colosseum.com/api/v1';
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-colosseum-pat'] }));
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
 app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => { res.setTimeout(120000); next(); });
 
@@ -36,7 +36,7 @@ async function callClaude(apiKey, messages, systemPrompt) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 3000,
       temperature: 0,
       system: systemPrompt,
@@ -52,13 +52,14 @@ async function callClaude(apiKey, messages, systemPrompt) {
 }
 
 function archiveKeywords(project_name, category, description) {
-  const words = `${project_name} ${category} ${description}`
-    .replace(/[^a-zA-Z0-9 ]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 4)
-    .slice(0, 6)
-    .join(' ');
-  return words;
+  // Use first sentence only for stability — full description causes variance
+  const firstSentence = description.split(/[.!?]/)[0].trim().slice(0, 100);
+  return `${category} ${firstSentence}`;
+}
+
+function archiveKeywordsSecondary(project_name, category) {
+  // Stable category-level query — never changes for same input
+  return `${category} Solana protocol yield stablecoin`;
 }
 
 function hackathonsForCategory(category) {
@@ -125,12 +126,45 @@ app.post('/research', async (req, res) => {
     await copilotGet('status', pat);
     console.log(`[research] Auth OK`);
 
-    const semanticQuery = `${project_name} ${description}`;
-    const problemQuery = `${category} problem ${description}`;
+    // STEP 0: Pre-process description into optimized search queries (like Copilot skill does)
+    console.log(`[research] Step 0: Extracting search queries...`);
+    const queryExtractionPrompt = `Extract optimized search queries from this project description for searching a Solana/crypto hackathon corpus.
+
+PROJECT: ${project_name} (${category})
+DESCRIPTION: ${description}
+
+Return ONLY this JSON (no markdown):
+{
+  "semantic_query": "<5-10 words: solution-focused rewrite, what the project does>",
+  "problem_query": "<5-10 words: problem-space rewrite, the user pain being solved>",
+  "archive_conceptual": "<3-6 words: timeless crypto primitive this relates to>",
+  "archive_implementation": "<3-6 words: modern Solana ecosystem terms>",
+  "problem_tags": ["<tag1>", "<tag2>", "<tag3>"]
+}`;
+
+    let queries;
+    try {
+      const qResponse = await callClaude(
+        anthropic_key,
+        [{ role: 'user', content: queryExtractionPrompt }],
+        'You are a search query optimizer for crypto/Solana research. Return ONLY valid JSON.'
+      );
+      const qMatch = qResponse.match(/\{[\s\S]*"semantic_query"[\s\S]*\}/);
+      queries = qMatch ? JSON.parse(qMatch[0]) : null;
+    } catch (e) {
+      queries = null;
+    }
+
+    // Fallback to simple queries if extraction fails
+    const semanticQuery = queries?.semantic_query || `${project_name} ${category} Solana`;
+    const problemQuery = queries?.problem_query || `${category} user problem Solana`;
+    const archiveConceptual = queries?.archive_conceptual || `${category} crypto protocol`;
+    const archiveImplementation = queries?.archive_implementation || `${category} Solana DeFi`;
+    const problemTags = queries?.problem_tags || [];
     const nameQuery = project_name;
-    const archiveKeywordsGeneral = archiveKeywords(project_name, category, description);
-    const archiveKeywordsCategory = `${category} crypto Solana`;
     const hackathons = hackathonsForCategory(category);
+
+    console.log(`[research] Queries: semantic="${semanticQuery}" problem="${problemQuery}" archive="${archiveConceptual}/${archiveImplementation}"`);
 
     const [
       s1_projects_semantic,
@@ -138,18 +172,23 @@ app.post('/research', async (req, res) => {
       s3_projects_accelerator,
       s4_projects_winners,
       s5_projects_by_name,
-      s6_archives_general,
-      s7_archives_category,
-      s8_filters,
-      s9_analyze,
+      s6_projects_tags,
+      s7_archives_conceptual,
+      s8_archives_implementation,
+      s9_filters,
+      s10_analyze,
     ] = await Promise.allSettled([
       copilotPost('search/projects', pat, { query: semanticQuery, limit: 12 }),
       copilotPost('search/projects', pat, { query: problemQuery, limit: 10 }),
       copilotPost('search/projects', pat, { query: semanticQuery, limit: 10, filters: { acceleratorOnly: true } }),
       copilotPost('search/projects', pat, { query: semanticQuery, limit: 8, filters: { winnersOnly: true } }),
       copilotPost('search/projects', pat, { query: nameQuery, limit: 5 }),
-      copilotPost('search/archives', pat, { query: archiveKeywordsGeneral, limit: 5, maxChunksPerDoc: 1 }),
-      copilotPost('search/archives', pat, { query: archiveKeywordsCategory, limit: 5, maxChunksPerDoc: 1 }),
+      // Tag-filtered follow-up (like the real Copilot skill) — filter only, no query string
+      problemTags.length > 0
+        ? copilotPost('search/projects', pat, { limit: 10, filters: { problemTags } })
+        : Promise.resolve({ results: [] }),
+      copilotPost('search/archives', pat, { query: archiveConceptual, limit: 5, maxChunksPerDoc: 1 }),
+      copilotPost('search/archives', pat, { query: archiveImplementation, limit: 5, maxChunksPerDoc: 1 }),
       copilotGet('filters', pat),
       copilotPost('analyze', pat, {
         cohort: { hackathons, winnersOnly: false },
@@ -164,12 +203,13 @@ app.post('/research', async (req, res) => {
     const projects_accelerator = settled(s3_projects_accelerator).map(trimProject);
     const projects_winners     = settled(s4_projects_winners).map(trimProject);
     const projects_by_name     = settled(s5_projects_by_name).map(trimProject);
-    const archives_general     = settled(s6_archives_general).map(trimArchive);
-    const archives_category    = settled(s7_archives_category).map(trimArchive);
-    const filters              = s8_filters.status === 'fulfilled' ? s8_filters.value : null;
-    const analyze              = s9_analyze.status === 'fulfilled' ? s9_analyze.value : null;
+    const projects_tags        = settled(s6_projects_tags).map(trimProject);
+    const archives_general     = settled(s7_archives_conceptual).map(trimArchive);
+    const archives_category    = settled(s8_archives_implementation).map(trimArchive);
+    const filters              = s9_filters.status === 'fulfilled' ? s9_filters.value : null;
+    const analyze              = s10_analyze.status === 'fulfilled' ? s10_analyze.value : null;
 
-    console.log(`[research] Data: semantic=${projects_semantic.length} problem=${projects_problem.length} accelerator=${projects_accelerator.length} winners=${projects_winners.length} archives=${archives_general.length + archives_category.length}`);
+    console.log(`[research] Data: semantic=${projects_semantic.length} problem=${projects_problem.length} tags=${projects_tags.length} accelerator=${projects_accelerator.length} winners=${projects_winners.length} archives=${archives_general.length + archives_category.length}`);
 
     const systemPrompt = `You are an expert Colosseum hackathon analyst.
 Analyze ALL provided corpus data carefully and produce a rigorous, evidence-based scorecard.
@@ -182,11 +222,21 @@ Return ONLY valid JSON, no markdown, no text outside the JSON.`;
 PROJECT: ${project_name} | ${category} | ${country}
 DESCRIPTION: ${description}
 
+SEARCH QUERIES USED:
+- Semantic: "${semanticQuery}"
+- Problem-space: "${problemQuery}"
+- Archive conceptual: "${archiveConceptual}"
+- Archive implementation: "${archiveImplementation}"
+- Problem tags: ${JSON.stringify(problemTags)}
+
 ── SIMILAR PROJECTS semantic search (${projects_semantic.length}) ──
 ${JSON.stringify(projects_semantic)}
 
 ── SIMILAR PROJECTS problem-space search (${projects_problem.length}) ──
 ${JSON.stringify(projects_problem)}
+
+── SIMILAR PROJECTS tag-filtered search (${projects_tags.length}) ──
+${JSON.stringify(projects_tags)}
 
 ── ACCELERATOR PORTFOLIO (${projects_accelerator.length}) ──
 ${JSON.stringify(projects_accelerator)}
@@ -197,10 +247,10 @@ ${JSON.stringify(projects_winners)}
 ── ENTITY SEARCH by name (${projects_by_name.length}) ──
 ${JSON.stringify(projects_by_name)}
 
-── ARCHIVE SOURCES general (${archives_general.length}) ──
+── ARCHIVE SOURCES conceptual (${archives_general.length}) ──
 ${JSON.stringify(archives_general)}
 
-── ARCHIVE SOURCES category (${archives_category.length}) ──
+── ARCHIVE SOURCES implementation (${archives_category.length}) ──
 ${JSON.stringify(archives_category)}
 
 ── HACKATHON CHRONOLOGY ──
@@ -209,13 +259,17 @@ ${JSON.stringify(filters?.hackathons || [])}
 ── HACKATHON ANALYSIS ──
 ${JSON.stringify(analyze || 'Not available')}
 
-SCORING RULES:
-- Be critical. If many similar projects exist, novelty and competitive_gap must be LOW.
-- accelerator_overlap: if accelerator projects match → score LOW (more competition)
-- hackathon_precedent: if many similar hackathon projects → score LOW (saturated)
-- builder_density: if space is crowded → score LOW
-- Each dimension_insight must cite specific slugs or archive titles from the data above.
-- Do NOT invent project names. Only cite what appears in the data.
+SCORING RULES — follow these strictly to ensure consistent scores:
+- novelty: 1-3 if 5+ very similar projects found, 4-6 if some overlap, 7-9 if few matches, 10 if truly unique
+- competitive_gap: 1-3 if accelerator projects directly compete, 4-6 if adjacent, 7-9 if no direct competition
+- hackathon_precedent: 1-3 if 10+ similar projects in corpus, 4-6 if 3-9 similar, 7-9 if 1-2 similar, 10 if none
+- builder_density: 1-3 if very crowded (many projects), 4-6 moderate, 7-9 sparse
+- accelerator_overlap: 1-3 if direct accelerator competitors found, 4-6 adjacent, 7-10 if none
+- market_timing: base on archive evidence strength — 1-3 weak, 4-6 moderate, 7-9 strong archive backing
+- archive_backing: 1-3 if 0-1 relevant archives, 4-6 if 2-3, 7-9 if 4+ strong matches
+- mechanism_design: 1-3 if mechanism is common/basic, 4-6 if moderately novel, 7-9 if sophisticated and unique
+- Each insight MUST cite specific slugs or archive titles from the data. Do NOT invent names.
+- Scores must be grounded in corpus evidence above — not general knowledge.
 
 Return ONLY this JSON (no markdown):
 {
