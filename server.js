@@ -51,7 +51,35 @@ async function callClaude(apiKey, messages, systemPrompt) {
   return data.content[0].text;
 }
 
-// Trim to essential fields only to manage token count
+// Extract 3-6 focused keywords for archive search (long queries dilute embeddings)
+function archiveKeywords(project_name, category, description) {
+  const words = `${project_name} ${category} ${description}`
+    .replace(/[^a-zA-Z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 4)
+    .slice(0, 6)
+    .join(' ');
+  return words;
+}
+
+// Route category to relevant hackathons per workflow-deep.md
+function hackathonsForCategory(category) {
+  const map = {
+    'Gaming': ['radar'],
+    'Infrastructure': ['breakout'],
+    'AI': ['breakout'],
+    'DePIN': ['breakout'],
+    'Consumer': ['renaissance'],
+    'DeFi': ['cypherpunk', 'breakout'],
+    'Stablecoins': ['cypherpunk', 'breakout'],
+    'Payments': ['cypherpunk', 'breakout'],
+    'DAOs & Network States': ['renaissance', 'cypherpunk'],
+    'Public Goods': ['renaissance'],
+    'Climate': ['breakout'],
+  };
+  return map[category] || ['breakout', 'radar', 'cypherpunk', 'renaissance'];
+}
+
 function trimProject(p) {
   return {
     name: p.name || p.title,
@@ -77,7 +105,7 @@ function settled(r) {
 }
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', mode: 'deep-research-v1' });
+  res.json({ status: 'ok', mode: 'deep-research-v2' });
 });
 
 app.post('/research', async (req, res) => {
@@ -93,124 +121,117 @@ app.post('/research', async (req, res) => {
   const pat = user_pat || process.env.COLOSSEUM_COPILOT_PAT;
   if (!pat) return res.status(500).json({ error: 'Colosseum PAT missing' });
 
-  console.log(`[research] Starting deep research: ${project_name}`);
+  console.log(`[research] Starting: ${project_name}`);
 
   try {
-    // STEP 1 — Auth preflight (required per SKILL.md)
+    // STEP 1 — Auth preflight
     await copilotGet('status', pat);
-    console.log(`[research] Step 1: Auth OK`);
+    console.log(`[research] Auth OK`);
 
-    // Full query = project name + full description (no truncation)
-    const fullQuery = `${project_name} ${description}`;
-    const categoryQuery = `${category} ${description}`;
+    // FIX 2: Two distinct project queries (semantic + problem-space rewrite)
+    const semanticQuery = `${project_name} ${description}`;
+    const problemQuery = `${category} problem ${description}`;
     const nameQuery = project_name;
 
-    // STEP 2 — Parallel searches following SKILL.md deep research workflow:
-    // - search/projects: general, acceleratorOnly, winnersOnly, by name
-    // - search/archives: by full description, by category
-    // - /filters: hackathon chronology
-    // - /analyze: hackathon distribution for this category
+    // FIX 3: Archive keywords — 3-6 focused words, not full description
+    const archiveKeywordsGeneral = archiveKeywords(project_name, category, description);
+    const archiveKeywordsCategory = `${category} crypto Solana`;
+
+    // FIX 1: Correct hackathon routing for /analyze
+    const hackathons = hackathonsForCategory(category);
+
+    // Run all searches in parallel
+    // Note: API allows 2 concurrent — server serializes overflow automatically
     const [
-      // Step 2a: Similar projects (general semantic search — full description)
-      s1_projects_general,
-      // Step 2b: Accelerator portfolio overlap (SKILL.md: required for evaluative queries)
-      s2_projects_accelerator,
-      // Step 2c: Hackathon winners only (precedent check)
-      s3_projects_winners,
-      // Step 2d: Search by project name alone (entity coverage check per SKILL.md)
-      s4_projects_by_name,
-      // Step 2e: Archives — general (required per SKILL.md archive integration rule)
-      s5_archives_general,
-      // Step 2f: Archives — by category (conceptual framing)
-      s6_archives_category,
-      // Step 2g: Hackathon chronology + available filters
-      s7_filters,
-      // Step 2h: Analyze hackathon distribution for this category
-      s8_analyze,
+      s1_projects_semantic,    // Query 1: semantic rewrite
+      s2_projects_problem,     // Query 2: problem-space rewrite (FIX 4)
+      s3_projects_accelerator, // Query 3: accelerator portfolio (REQUIRED)
+      s4_projects_winners,     // Winners check
+      s5_projects_by_name,     // Entity coverage check
+      s6_archives_general,     // FIX 3: focused keywords + maxChunksPerDoc
+      s7_archives_category,    // FIX 3: category-specific keywords
+      s8_filters,              // Hackathon chronology
+      s9_analyze,              // FIX 1: correct /analyze body
     ] = await Promise.allSettled([
-      copilotPost('search/projects', pat, { query: fullQuery, limit: 15 }),
-      copilotPost('search/projects', pat, { query: fullQuery, limit: 10, filters: { acceleratorOnly: true } }),
-      copilotPost('search/projects', pat, { query: fullQuery, limit: 10, filters: { winnersOnly: true } }),
+      copilotPost('search/projects', pat, { query: semanticQuery, limit: 12 }),
+      copilotPost('search/projects', pat, { query: problemQuery, limit: 10 }),
+      copilotPost('search/projects', pat, { query: semanticQuery, limit: 10, filters: { acceleratorOnly: true } }),
+      copilotPost('search/projects', pat, { query: semanticQuery, limit: 8, filters: { winnersOnly: true } }),
       copilotPost('search/projects', pat, { query: nameQuery, limit: 5 }),
-      copilotPost('search/archives', pat, { query: fullQuery, limit: 8 }),
-      copilotPost('search/archives', pat, { query: categoryQuery, limit: 5 }),
+      // FIX 3: maxChunksPerDoc: 1 for exploratory, focused keywords not full description
+      copilotPost('search/archives', pat, { query: archiveKeywordsGeneral, limit: 5, maxChunksPerDoc: 1 }),
+      copilotPost('search/archives', pat, { query: archiveKeywordsCategory, limit: 5, maxChunksPerDoc: 1 }),
       copilotGet('filters', pat),
-      copilotPost('analyze', pat, { query: fullQuery, hackathon: 'all' }).catch(() => null),
+      // FIX 1: correct /analyze body with proper cohort + dimensions
+      copilotPost('analyze', pat, {
+        cohort: { hackathons, winnersOnly: false },
+        dimensions: ['tracks', 'problemTags', 'techStack'],
+        topK: 8,
+        samplePerBucket: 1,
+      }).catch(() => null),
     ]);
 
-    // Extract and trim all results
-    const projects_general    = settled(s1_projects_general).map(trimProject);
-    const projects_accelerator= settled(s2_projects_accelerator).map(trimProject);
-    const projects_winners    = settled(s3_projects_winners).map(trimProject);
-    const projects_by_name    = settled(s4_projects_by_name).map(trimProject);
-    const archives_general    = settled(s5_archives_general).map(trimArchive);
-    const archives_category   = settled(s6_archives_category).map(trimArchive);
-    const filters             = s7_filters.status === 'fulfilled' ? s7_filters.value : null;
-    const analyze             = s8_analyze.status === 'fulfilled' ? s8_analyze.value : null;
+    const projects_semantic    = settled(s1_projects_semantic).map(trimProject);
+    const projects_problem     = settled(s2_projects_problem).map(trimProject);
+    const projects_accelerator = settled(s3_projects_accelerator).map(trimProject);
+    const projects_winners     = settled(s4_projects_winners).map(trimProject);
+    const projects_by_name     = settled(s5_projects_by_name).map(trimProject);
+    const archives_general     = settled(s6_archives_general).map(trimArchive);
+    const archives_category    = settled(s7_archives_category).map(trimArchive);
+    const filters              = s8_filters.status === 'fulfilled' ? s8_filters.value : null;
+    const analyze              = s9_analyze.status === 'fulfilled' ? s9_analyze.value : null;
 
-    // Deduplicate projects by slug
-    const allProjectSlugs = new Set();
-    function dedupe(arr) {
-      return arr.filter(p => {
-        if (!p.slug || allProjectSlugs.has(p.slug)) return true; // keep if no slug
-        allProjectSlugs.add(p.slug);
-        return true;
-      });
-    }
+    console.log(`[research] Data: semantic=${projects_semantic.length} problem=${projects_problem.length} accelerator=${projects_accelerator.length} winners=${projects_winners.length} archives=${archives_general.length + archives_category.length}`);
 
-    console.log(`[research] Step 2 complete: general=${projects_general.length} accelerator=${projects_accelerator.length} winners=${projects_winners.length} name=${projects_by_name.length} archives=${archives_general.length + archives_category.length}`);
-
-    // STEP 3 — Send all corpus data to Claude for scoring
-    const systemPrompt = `You are an expert Colosseum hackathon analyst. 
-You have received data from all 8 steps of the Colosseum Copilot deep research workflow.
-Analyze ALL the data carefully, then return ONLY a valid JSON scorecard.
+    const systemPrompt = `You are an expert Colosseum hackathon analyst.
+Analyze ALL provided corpus data carefully, then return ONLY a valid JSON scorecard.
 No markdown, no explanation, no text outside the JSON object.`;
 
-    const userMessage = `Deep research scorecard for this project:
+    const userMessage = `Score this project using Colosseum Copilot corpus data.
 
-PROJECT: ${project_name}
-CATEGORY: ${category}
-COUNTRY: ${country}
+PROJECT: ${project_name} | ${category} | ${country}
 DESCRIPTION: ${description}
 
-══ STEP 1: SIMILAR PROJECTS — semantic search (${projects_general.length} results) ══
-${JSON.stringify(projects_general)}
+── SIMILAR PROJECTS semantic search (${projects_semantic.length}) ──
+${JSON.stringify(projects_semantic)}
 
-══ STEP 2: ACCELERATOR PORTFOLIO — projects that won Colosseum accelerator (${projects_accelerator.length} results) ══
+── SIMILAR PROJECTS problem-space search (${projects_problem.length}) ──
+${JSON.stringify(projects_problem)}
+
+── ACCELERATOR PORTFOLIO (${projects_accelerator.length}) ──
 ${JSON.stringify(projects_accelerator)}
 
-══ STEP 3: HACKATHON WINNERS — prize winners across all editions (${projects_winners.length} results) ══
+── HACKATHON WINNERS (${projects_winners.length}) ──
 ${JSON.stringify(projects_winners)}
 
-══ STEP 4: ENTITY SEARCH — projects matching the project name directly (${projects_by_name.length} results) ══
+── ENTITY SEARCH by name (${projects_by_name.length}) ──
 ${JSON.stringify(projects_by_name)}
 
-══ STEP 5: ARCHIVE SOURCES — curated crypto literature (${archives_general.length} results) ══
+── ARCHIVE SOURCES general (${archives_general.length}) ──
 ${JSON.stringify(archives_general)}
 
-══ STEP 6: ARCHIVE SOURCES — category-specific (${archives_category.length} results) ══
+── ARCHIVE SOURCES category (${archives_category.length}) ──
 ${JSON.stringify(archives_category)}
 
-══ STEP 7: HACKATHON CHRONOLOGY ══
+── HACKATHON CHRONOLOGY ──
 ${JSON.stringify(filters?.hackathons || [])}
 
-══ STEP 8: HACKATHON ANALYSIS ══
+── HACKATHON ANALYSIS ──
 ${JSON.stringify(analyze || 'Not available')}
 
-══ SCORING INSTRUCTIONS ══
-Score each 1-10 based strictly on corpus evidence above:
+Score each 1-10 based strictly on the corpus data above:
 - novelty: Uniqueness vs all similar projects found
 - market_timing: Archive evidence for current demand
-- competitive_gap: Room to win given all competing projects + accelerator overlap
-- mechanism_design: Sophistication vs similar projects in corpus
-- accelerator_overlap: How many accelerator projects are in the same space
-- hackathon_precedent: How many similar winners/projects exist in hackathon history
+- competitive_gap: Room to win given competing projects + accelerator overlap
+- mechanism_design: Sophistication vs similar projects
+- accelerator_overlap: How many accelerator projects in same space (high = lower score)
+- hackathon_precedent: Similar winners/projects in hackathon history (high = lower score)
 - archive_backing: Strength of archive support for this thesis
-- builder_density: How crowded is the space (high density = lower score)
+- builder_density: How crowded the space is (high = lower score)
 
 Return ONLY this JSON:
 {
-  "score": <weighted average of all 8 dimensions>,
+  "score": <weighted average>,
   "novelty": <1-10>,
   "market_timing": <1-10>,
   "competitive_gap": <1-10>,
@@ -219,9 +240,9 @@ Return ONLY this JSON:
   "hackathon_precedent": <1-10>,
   "archive_backing": <1-10>,
   "builder_density": <1-10>,
-  "summary": "<3-4 sentences citing specific slugs and archive titles from the data>",
+  "summary": "<3-4 sentences citing specific slugs and archive titles from the data above>",
   "top_competing_projects": ["<real slug from corpus>", "<real slug>", "<real slug>"],
-  "key_sources": ["<real archive title from corpus>", "<real archive title>"]
+  "key_sources": ["<real archive title>", "<real archive title>"]
 }`;
 
     const claudeResponse = await callClaude(
@@ -259,6 +280,6 @@ Return ONLY this JSON:
 });
 
 app.listen(PORT, () => {
-  console.log(`[server] Running on port ${PORT} — deep research mode`);
+  console.log(`[server] Running on port ${PORT} — deep research v2`);
   console.log(`[server] PAT: ${process.env.COLOSSEUM_COPILOT_PAT ? '✓ set' : '✗ missing'}`);
 });
