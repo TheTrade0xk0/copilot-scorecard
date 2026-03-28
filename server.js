@@ -9,7 +9,6 @@ app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders:
 app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => { res.setTimeout(120000); next(); });
 
-// GET request to Colosseum API
 async function copilotGet(endpoint, pat) {
   const res = await fetch(`${COPILOT_BASE}/${endpoint}`, {
     headers: { 'Authorization': `Bearer ${pat}` }
@@ -18,7 +17,6 @@ async function copilotGet(endpoint, pat) {
   return res.json();
 }
 
-// POST request to Colosseum API
 async function copilotPost(endpoint, pat, body) {
   const res = await fetch(`${COPILOT_BASE}/${endpoint}`, {
     method: 'POST',
@@ -29,7 +27,6 @@ async function copilotPost(endpoint, pat, body) {
   return res.json();
 }
 
-// Call Anthropic API directly
 async function callClaude(apiKey, messages, systemPrompt) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -41,6 +38,7 @@ async function callClaude(apiKey, messages, systemPrompt) {
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
+      temperature: 0,
       system: systemPrompt,
       messages,
     }),
@@ -51,6 +49,26 @@ async function callClaude(apiKey, messages, systemPrompt) {
   }
   const data = await res.json();
   return data.content[0].text;
+}
+
+function trimProject(p) {
+  return {
+    name: p.name || p.title,
+    slug: p.slug,
+    description: (p.description || p.summary || '').slice(0, 150),
+    hackathon: p.hackathon?.slug || p.hackathon,
+    tags: p.tags?.slice(0, 5),
+    score: p.score || p.similarity,
+  };
+}
+
+function trimArchive(a) {
+  return {
+    title: a.title,
+    summary: (a.summary || a.content || '').slice(0, 200),
+    source: a.source || a.url,
+    date: a.date || a.publishedAt,
+  };
 }
 
 app.get('/health', (req, res) => {
@@ -73,11 +91,8 @@ app.post('/research', async (req, res) => {
   console.log(`[research] Starting: ${project_name}`);
 
   try {
-    // Step 1: Auth check
     await copilotGet('status', pat);
-    console.log(`[research] Auth OK`);
 
-    // Step 2: Run all searches in parallel using CORRECT endpoints
     const query = `${project_name} ${description}`;
 
     const [
@@ -86,99 +101,49 @@ app.post('/research', async (req, res) => {
       projectsWinners,
       archivesGeneral,
       archivesCategory,
-      filters,
     ] = await Promise.allSettled([
-      // General project search - full description
-      copilotPost('search/projects', pat, {
-        query,
-        limit: 20,
-      }),
-      // Accelerator-only projects (for accelerator_overlap dimension)
-      copilotPost('search/projects', pat, {
-        query,
-        limit: 10,
-        filters: { acceleratorOnly: true },
-      }),
-      // Winners only (for hackathon_precedent dimension)
-      copilotPost('search/projects', pat, {
-        query,
-        limit: 10,
-        filters: { winnersOnly: true },
-      }),
-      // Archive search - full description
-      copilotPost('search/archives', pat, {
-        query,
-        limit: 10,
-      }),
-      // Archive search - by category
-      copilotPost('search/archives', pat, {
-        query: `${category} ${description}`,
-        limit: 10,
-      }),
-      // Get available filters + hackathon chronology
-      copilotGet('filters', pat),
+      copilotPost('search/projects', pat, { query, limit: 15 }),
+      copilotPost('search/projects', pat, { query, limit: 8, filters: { acceleratorOnly: true } }),
+      copilotPost('search/projects', pat, { query, limit: 8, filters: { winnersOnly: true } }),
+      copilotPost('search/archives', pat, { query, limit: 8 }),
+      copilotPost('search/archives', pat, { query: `${category} ${project_name}`, limit: 5 }),
     ]);
 
-    function getVal(settled) {
-      return settled.status === 'fulfilled' ? settled.value : null;
+    function getResults(settled) {
+      return settled.status === 'fulfilled' ? (settled.value?.results || []) : [];
     }
 
-    const projectsData       = getVal(projectsGeneral);
-    const acceleratorData    = getVal(projectsAccelerator);
-    const winnersData        = getVal(projectsWinners);
-    const archivesData       = getVal(archivesGeneral);
-    const archivesCatData    = getVal(archivesCategory);
-    const filtersData        = getVal(filters);
+    const projects    = getResults(projectsGeneral).map(trimProject);
+    const accelerator = getResults(projectsAccelerator).map(trimProject);
+    const winners     = getResults(projectsWinners).map(trimProject);
+    const archives    = [...getResults(archivesGeneral), ...getResults(archivesCategory)]
+                         .slice(0, 10).map(trimArchive);
 
-    console.log(`[research] Results: projects=${projectsData?.results?.length || 0} accelerator=${acceleratorData?.results?.length || 0} winners=${winnersData?.results?.length || 0} archives=${archivesData?.results?.length || 0}`);
+    console.log(`[research] Data: projects=${projects.length} accelerator=${accelerator.length} winners=${winners.length} archives=${archives.length}`);
 
-    // Step 3: Send to Claude for scoring
     const systemPrompt = `You are an expert crypto/Solana ecosystem analyst for Colosseum hackathons.
-Analyze the provided Colosseum Copilot corpus data and return ONLY a valid JSON scorecard.
-No markdown, no explanation, nothing outside the JSON.`;
+Analyze the Colosseum Copilot corpus data and return ONLY a valid JSON scorecard. No markdown, no text outside the JSON.`;
 
-    const userMessage = `Analyze this project using the Colosseum Copilot corpus data below.
+    const userMessage = `Score this project using Colosseum corpus data.
 
-PROJECT:
-- Name: ${project_name}
-- Category: ${category}
-- Country: ${country}
-- Description: ${description}
+PROJECT: ${project_name} | ${category} | ${country}
+DESCRIPTION: ${description}
 
-═══ COLOSSEUM CORPUS DATA ═══
+SIMILAR PROJECTS (${projects.length}):
+${JSON.stringify(projects)}
 
-## Similar Projects (semantic search, ${projectsData?.results?.length || 0} results):
-${JSON.stringify(projectsData?.results || [], null, 2)}
+ACCELERATOR PORTFOLIO (${accelerator.length}):
+${JSON.stringify(accelerator)}
 
-## Accelerator Portfolio Overlap (${acceleratorData?.results?.length || 0} results):
-${JSON.stringify(acceleratorData?.results || [], null, 2)}
+HACKATHON WINNERS (${winners.length}):
+${JSON.stringify(winners)}
 
-## Hackathon Winners (${winnersData?.results?.length || 0} results):
-${JSON.stringify(winnersData?.results || [], null, 2)}
-
-## Archive Sources - General (${archivesData?.results?.length || 0} results):
-${JSON.stringify(archivesData?.results || [], null, 2)}
-
-## Archive Sources - Category (${archivesCatData?.results?.length || 0} results):
-${JSON.stringify(archivesCatData?.results || [], null, 2)}
-
-## Available Hackathons (chronological):
-${JSON.stringify(filtersData?.hackathons || [], null, 2)}
-
-═══ SCORING GUIDE ═══
-
-- novelty: How unique vs all similar projects found?
-- market_timing: Does archive data support strong current demand?
-- competitive_gap: Room to win given competing projects?
-- mechanism_design: Sophistication of core mechanism?
-- accelerator_overlap: Overlap with accelerator portfolio projects?
-- hackathon_precedent: Similar projects in hackathon history?
-- archive_backing: Archive sources supporting this market?
-- builder_density: How crowded is this space? (high = low score)
+ARCHIVE SOURCES (${archives.length}):
+${JSON.stringify(archives)}
 
 Return ONLY this JSON:
 {
-  "score": <weighted average 1-10>,
+  "score": <weighted average>,
   "novelty": <1-10>,
   "market_timing": <1-10>,
   "competitive_gap": <1-10>,
@@ -187,9 +152,9 @@ Return ONLY this JSON:
   "hackathon_precedent": <1-10>,
   "archive_backing": <1-10>,
   "builder_density": <1-10>,
-  "summary": "<3-4 sentences citing specific project slugs and archive titles from corpus>",
-  "top_competing_projects": ["<real slug from corpus>", "<real slug>", "<real slug>"],
-  "key_sources": ["<real archive title>", "<real archive title>"]
+  "summary": "<3-4 sentences with specific project names/slugs and archive titles from data above>",
+  "top_competing_projects": ["<slug from data>", "<slug>", "<slug>"],
+  "key_sources": ["<archive title>", "<archive title>"]
 }`;
 
     const claudeResponse = await callClaude(
@@ -199,7 +164,7 @@ Return ONLY this JSON:
     );
 
     const match = claudeResponse.match(/\{[\s\S]*"score"[\s\S]*\}/);
-    if (!match) throw new Error('Could not extract scorecard from response');
+    if (!match) throw new Error('Could not extract scorecard — try again');
 
     const data = JSON.parse(match[0]);
     const dims = ['novelty','market_timing','competitive_gap','mechanism_design',
@@ -220,8 +185,8 @@ Return ONLY this JSON:
       return res.status(401).json({ error: 'Invalid Anthropic API key' });
     if (err.message.includes('Copilot') && err.message.includes('401'))
       return res.status(401).json({ error: 'Invalid Colosseum PAT' });
-    if (err.message.includes('rate_limit'))
-      return res.status(429).json({ error: 'Rate limit hit — retry in a moment' });
+    if (err.message.includes('rate_limit') || err.message.includes('rate limit'))
+      return res.status(429).json({ error: 'Rate limit hit — wait 1 minute and retry' });
     res.status(500).json({ error: err.message || 'Research failed' });
   }
 });
