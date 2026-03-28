@@ -421,25 +421,35 @@ const SUPABASE_URL = 'https://popeauzmykmmztjfekaa.supabase.co';
 app.get('/share/:filename', (req, res) => {
   const { filename } = req.params;
   const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/scorecards/${filename}`;
-  const projectName = filename.split('-').slice(0, -1).join(' ').replace(/\b\w/g, c => c.toUpperCase());
+  const projectName = filename.replace(/-\d+\.png$/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const appUrl = 'https://copilot-scorecard.vercel.app';
 
+  res.setHeader('Cache-Control', 'no-cache');
   res.send(`<!DOCTYPE html>
-<html>
+<html prefix="og: http://ogp.me/ns#">
 <head>
   <meta charset="UTF-8">
+  <title>${projectName} — Arena Research Score</title>
+  <meta name="description" content="Project idea scored by Arena Research, powered by Colosseum Copilot + Anthropic">
+  <meta property="og:type" content="website">
   <meta property="og:title" content="${projectName} — Arena Research Score">
   <meta property="og:description" content="Project idea scored by Arena Research, powered by Colosseum Copilot + Anthropic">
   <meta property="og:image" content="${imageUrl}">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1240">
   <meta property="og:image:height" content="620">
-  <meta property="og:url" content="https://copilot-scorecard-production.up.railway.app/share/${filename}">
+  <meta property="og:url" content="${req.protocol}://${req.get('host')}/share/${filename}">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@backyard_fi">
   <meta name="twitter:title" content="${projectName} — Arena Research Score">
   <meta name="twitter:description" content="Project idea scored by Arena Research, powered by Colosseum Copilot + Anthropic">
   <meta name="twitter:image" content="${imageUrl}">
-  <meta http-equiv="refresh" content="0;url=https://copilot-scorecard.vercel.app">
+  <meta name="twitter:image:src" content="${imageUrl}">
 </head>
-<body>Redirecting...</body>
+<body>
+  <p>Redirecting to Arena Research...</p>
+  <script>window.location.href = "${appUrl}";</script>
+</body>
 </html>`);
 });
 
