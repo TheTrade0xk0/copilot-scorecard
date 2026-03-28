@@ -275,6 +275,92 @@ Return ONLY this JSON (no markdown):
   }
 });
 
+app.post('/competitive-dive', async (req, res) => {
+  const { anthropic_key, colosseum_pat: user_pat, project_name, category, description, competing_slugs } = req.body;
+  if (!anthropic_key) return res.status(400).json({ error: 'Anthropic API key required' });
+  if (!competing_slugs?.length) return res.status(400).json({ error: 'No competing projects provided' });
+
+  const pat = user_pat || process.env.COLOSSEUM_COPILOT_PAT;
+  if (!pat) return res.status(500).json({ error: 'Colosseum PAT missing' });
+
+  try {
+    // Fetch full details for each competing project + archive search
+    const [projectDetails, archives] = await Promise.all([
+      Promise.allSettled(competing_slugs.map(slug => copilotGet(`projects/by-slug/${slug}`, pat))),
+      copilotPost('search/archives', pat, {
+        query: `${project_name} ${category} competitor analysis`,
+        limit: 4,
+        maxChunksPerDoc: 1,
+      }).catch(() => ({ results: [] })),
+    ]);
+
+    const projects = projectDetails
+      .filter(r => r.status === 'fulfilled')
+      .map(r => {
+        const p = r.value;
+        return {
+          name: p.name,
+          slug: p.slug,
+          description: (p.description || p.oneLiner || '').slice(0, 300),
+          hackathon: p.hackathon?.name || p.hackathon?.slug,
+          hackathon_date: p.hackathon?.startDate,
+          prize: p.prize || null,
+          tags: Array.isArray(p.tags) ? p.tags.slice(0, 6) : [],
+          links: p.links?.website || p.links?.github || null,
+        };
+      });
+
+    const archiveResults = (archives.results || []).map(trimArchive);
+
+    const prompt = `You are a competitive intelligence analyst for Solana/crypto startups.
+
+OUR PROJECT: ${project_name} (${category})
+DESCRIPTION: ${description}
+
+COMPETING PROJECTS FROM COLOSSEUM CORPUS:
+${JSON.stringify(projects, null, 2)}
+
+RELEVANT ARCHIVE SOURCES:
+${JSON.stringify(archiveResults, null, 2)}
+
+For each competing project, analyze:
+1. What they built and when
+2. How directly they compete with our project (direct/adjacent/tangential)
+3. Their apparent strengths
+4. Differentiation angle our project could take against them
+
+Then provide an overall competitive landscape summary.
+
+Return ONLY this JSON:
+{
+  "competitors": [
+    {
+      "slug": "<slug>",
+      "name": "<name>",
+      "hackathon": "<hackathon + date>",
+      "prize": "<prize or null>",
+      "what_they_built": "<1-2 sentences>",
+      "overlap": "direct" | "adjacent" | "tangential",
+      "their_strengths": "<1 sentence>",
+      "differentiation_angle": "<1-2 sentences on how our project can differentiate>"
+    }
+  ],
+  "landscape_summary": "<3-4 sentences overall competitive landscape assessment with specific evidence>"
+}`;
+
+    const response = await callClaude(anthropic_key, [{ role: 'user', content: prompt }],
+      'You are a competitive intelligence analyst. Return ONLY valid JSON, no markdown.');
+
+    const match = response.match(/\{[\s\S]*"competitors"[\s\S]*\}/);
+    if (!match) throw new Error('Could not parse competitive analysis');
+
+    res.json({ success: true, analysis: JSON.parse(match[0]) });
+  } catch (err) {
+    console.error(`[competitive-dive] Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/project/:slug', async (req, res) => {
   const { slug } = req.params;
   const pat = req.headers['x-colosseum-pat'] || process.env.COLOSSEUM_COPILOT_PAT;
