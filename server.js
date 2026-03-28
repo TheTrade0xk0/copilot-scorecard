@@ -36,7 +36,7 @@ async function callClaude(apiKey, messages, systemPrompt) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 3000,
       temperature: 0,
       system: systemPrompt,
@@ -272,6 +272,19 @@ Return ONLY this JSON (no markdown):
     if (err.message.includes('rate_limit') || err.message.includes('rate limit'))
       return res.status(429).json({ error: 'Rate limit hit — wait 1 minute and retry' });
     res.status(500).json({ error: err.message || 'Research failed' });
+  }
+});
+
+app.get('/project/:slug', async (req, res) => {
+  const { slug } = req.params;
+  const pat = req.headers['x-colosseum-pat'] || process.env.COLOSSEUM_COPILOT_PAT;
+  if (!pat) return res.status(400).json({ error: 'Colosseum PAT required' });
+  try {
+    const data = await copilotGet(`projects/by-slug/${slug}`, pat);
+    res.json({ success: true, project: data });
+  } catch (err) {
+    console.error(`[project] Error fetching ${slug}: ${err.message}`);
+    res.status(500).json({ error: err.message });
   }
 });
 
