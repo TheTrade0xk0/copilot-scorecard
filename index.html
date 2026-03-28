@@ -304,19 +304,10 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
         </div>
         <div class="field">
           <label>Country</label>
-          <select id="country-select" onchange="handleCountrySelect(this.value)" style="margin-bottom:6px;">
-            <option value="">Select country...</option>
-            <option>Ukraine</option><option>United States</option><option>United Kingdom</option>
-            <option>Germany</option><option>France</option><option>India</option>
-            <option>China</option><option>Japan</option><option>Korea</option>
-            <option>Brazil</option><option>Canada</option><option>Australia</option>
-            <option>Singapore</option><option>Netherlands</option><option>Switzerland</option>
-            <option>Spain</option><option>Italy</option><option>Poland</option>
-            <option>Nigeria</option><option>Argentina</option><option>Mexico</option>
-            <option>Turkey</option><option>Portugal</option><option>Sweden</option>
-            <option value="other">Other (type below)</option>
-          </select>
-          <input type="text" id="country" placeholder="Or type your country..." style="display:none;">
+          <div style="position:relative;">
+            <input type="text" id="country" placeholder="Type your country..." autocomplete="off" oninput="filterCountries(this.value)" onfocus="filterCountries(this.value)" onblur="setTimeout(()=>hideCountries(),150)">
+            <div id="country-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--border2);border-top:none;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;z-index:50;"></div>
+          </div>
         </div>
       </div>
 
@@ -480,7 +471,31 @@ function closeProjectModal(e) {
   if (e.target === document.getElementById('modal-project-overlay')) closeProjectModalBtn();
 }
 
-function openHelp() { document.getElementById('modal-help-overlay').classList.add('visible'); }
+const COUNTRIES = ["Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia","Cameroon","Canada","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Vanuatu","Vatican City","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe"];
+
+function filterCountries(val) {
+  const dd = document.getElementById('country-dropdown');
+  if (!val.trim()) { dd.style.display = 'none'; return; }
+  const matches = COUNTRIES.filter(c => c.toLowerCase().startsWith(val.toLowerCase())).slice(0, 8);
+  if (!matches.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = matches.map(c => `<div onclick="selectCountry('${c}')" style="padding:9px 14px;font-size:13px;cursor:pointer;color:var(--text);transition:background .15s;" onmouseover="this.style.background='#1e1e1e'" onmouseout="this.style.background='none'">${c}</div>`).join('');
+  dd.style.display = 'block';
+}
+
+function selectCountry(name) {
+  document.getElementById('country').value = name;
+  document.getElementById('country-dropdown').style.display = 'none';
+}
+
+function hideCountries() {
+  document.getElementById('country-dropdown').style.display = 'none';
+}
+
+function getCountry() {
+  return document.getElementById('country').value.trim();
+}
+
+function handleCountrySelect() {} // no-op, kept for safety
 function closeHelpBtn() { document.getElementById('modal-help-overlay').classList.remove('visible'); }
 function closeHelp(e) { if (e.target === document.getElementById('modal-help-overlay')) closeHelpBtn(); }
 
@@ -513,8 +528,7 @@ function closeScorecardAndClear() {
   document.getElementById('modal-scorecard-overlay').classList.remove('visible');
   ['anthropic-key','colosseum-pat','proj-name','x-link','country','description'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('category').value = '';
-  document.getElementById('country-select').value = '';
-  document.getElementById('country').style.display = 'none';
+  document.getElementById('country-dropdown').style.display = 'none';
   currentResult = null;
 }
 
