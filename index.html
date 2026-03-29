@@ -627,8 +627,10 @@ function renderScorecard(r) {
     document.getElementById('sc-competing-list').innerHTML = '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2)">No direct competitors found in corpus</span>';
   }
 
-  document.getElementById('btn-submit').disabled = false;
-  document.getElementById('btn-submit').textContent = 'Submit to Leaderboard →';
+  document.getElementById('btn-submit').style.display = 'none';
+
+  // Auto-submit to leaderboard
+  submitToLeaderboard(true);
 }
 
 function buildShareCard(r) {
@@ -751,10 +753,10 @@ async function shareOnX() {
   }
 }
 
-async function submitToLeaderboard() {
+async function submitToLeaderboard(silent = false) {
   if (!currentResult) return;
   const btn = document.getElementById('btn-submit');
-  btn.disabled = true; btn.textContent = 'Submitting...';
+  if (!silent) { btn.disabled = true; btn.textContent = 'Submitting...'; }
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/scores`, {
       method: 'POST',
@@ -770,11 +772,9 @@ async function submitToLeaderboard() {
       }),
     });
     if (!res.ok) throw new Error('Submit failed');
-    toast('Added to leaderboard! 🎉', 'success');
-    btn.textContent = 'Submitted ✓';
+    if (!silent) { toast('Added to leaderboard! 🎉', 'success'); btn.textContent = 'Submitted ✓'; }
   } catch {
-    toast('Submit failed — try again', 'error');
-    btn.disabled = false; btn.textContent = 'Submit to Leaderboard →';
+    if (!silent) { toast('Submit failed — try again', 'error'); btn.disabled = false; btn.textContent = 'Submit to Leaderboard →'; }
   }
 }
 
