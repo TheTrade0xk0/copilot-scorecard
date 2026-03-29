@@ -215,6 +215,14 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
   </div>
 </div>
 
+<!-- LEADERBOARD REPORT MODAL -->
+<div class="modal-overlay" id="modal-lb-report-overlay" onclick="closeLbReport(event)">
+  <div class="modal-scorecard">
+    <div class="modal-scorecard-inner" id="lb-report-inner">
+    </div>
+  </div>
+</div>
+
 <!-- PROJECT INFO MODAL -->
 <div class="modal-overlay" id="modal-project-overlay" onclick="closeProjectModal(event)">
   <div class="modal-help" id="modal-project-inner">
@@ -325,7 +333,7 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
   </div>
 
   <div class="page" id="page-leaderboard">
-    <div class="lb-header"><div><div class="lb-title">Leaderboard</div><div class="lb-count" id="lb-count">Loading...</div></div></div>
+    <div class="lb-header"><div><div class="lb-title">Ideas Leaderboard</div><div style="font-size:13px;color:var(--muted);margin-top:6px;margin-bottom:4px;">Explore ideas, spot competitors, and validate your concept before you build.</div><div class="lb-count" id="lb-count">Loading...</div></div></div>
     <div class="lb-filters">
       <button class="f-btn active" onclick="filterLB('all',this)">All tracks</button>
       <button class="f-btn" onclick="filterLB('Consumer',this)">Consumer</button>
@@ -337,7 +345,7 @@ footer{border-top:1px solid var(--border);padding:24px 0;display:flex;justify-co
       <button class="f-btn" onclick="filterLB('AI',this)">AI</button>
     </div>
     <table class="lb-table">
-      <thead><tr><th>#</th><th>Project</th><th>Track</th><th>Country</th><th style="text-align:right">Score</th></tr></thead>
+      <thead><tr><th>#</th><th>Project</th><th>Track</th><th>Country</th><th style="text-align:right">Score</th><th></th></tr></thead>
       <tbody id="lb-body"><tr><td colspan="5"><div class="empty-state"><div>⟳</div>Loading...</div></td></tr></tbody>
     </table>
   </div>
@@ -493,6 +501,61 @@ function getCountry() {
 }
 function closeHelpBtn() { document.getElementById('modal-help-overlay').classList.remove('visible'); }
 function closeHelp(e) { if (e.target === document.getElementById('modal-help-overlay')) closeHelpBtn(); }
+
+function openLbReport(s) {
+  const insights = s.insights ? (typeof s.insights === 'string' ? JSON.parse(s.insights) : s.insights) : {};
+  const competing = s.competing_projects ? (typeof s.competing_projects === 'string' ? JSON.parse(s.competing_projects) : s.competing_projects) : [];
+  const dims = [
+    { key: 'novelty', label: 'Novelty' },
+    { key: 'market_timing', label: 'Market Timing' },
+    { key: 'competitive_gap', label: 'Competitive Gap' },
+    { key: 'mechanism_design', label: 'Mechanism Design' },
+    { key: 'accelerator_overlap', label: 'Accelerator Overlap' },
+    { key: 'hackathon_precedent', label: 'Hackathon Precedent' },
+    { key: 'archive_backing', label: 'Archive Backing' },
+    { key: 'builder_density', label: 'Builder Density' },
+  ];
+
+  const dimsHtml = dims.map(d => {
+    const val = s[d.key] || 0;
+    const pct = val * 10;
+    const color = val >= 7 ? 'var(--green)' : val >= 5 ? 'var(--amber)' : 'var(--red)';
+    const insight = insights[d.key] || '';
+    return `<div class="dim-item">
+      <div class="dim-header" onclick="toggleDim(this)">
+        <span class="dim-name">${d.label}</span>
+        <div class="dim-bar-wrap"><div class="dim-bar" style="width:${pct}%;background:${color}"></div></div>
+        <span class="dim-val ${scoreClass(val)}">${val}</span>
+        <span class="dim-arrow">▼</span>
+      </div>
+      ${insight ? `<div class="dim-insight">${insight}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const competingHtml = competing.length ? `
+    <div class="sc-competing" style="display:block;">
+      <div class="sc-competing-title">Competing projects found</div>
+      <div class="sc-competing-list">${competing.map(p => {
+        const displayName = p.replace(/-\d+$/, '').replace(/-/g, ' ');
+        return `<span class="sc-competing-tag">${displayName}</span>`;
+      }).join('')}</div>
+    </div>` : '';
+
+  document.getElementById('lb-report-inner').innerHTML = `
+    <div class="sc-header">
+      <div><div class="sc-project">${s.project_name}</div><div class="sc-meta">${s.category} · ${s.country}</div></div>
+      <div class="sc-score-big"><div class="sc-score-num ${scoreClass(s.score)}">${Number(s.score).toFixed(2)}</div><div class="sc-score-label">/ 10 overall</div></div>
+    </div>
+    <div class="dims-list">${dimsHtml}</div>
+    <div class="sc-summary">${s.summary || ''}</div>
+    ${competingHtml}
+    <button class="btn-close-modal" onclick="closeLbReportBtn()">Close</button>
+  `;
+  document.getElementById('modal-lb-report-overlay').classList.add('visible');
+}
+
+function closeLbReportBtn() { document.getElementById('modal-lb-report-overlay').classList.remove('visible'); }
+function closeLbReport(e) { if (e.target === document.getElementById('modal-lb-report-overlay')) closeLbReportBtn(); }
 
 function openHelp() { document.getElementById('modal-help-overlay').classList.add('visible'); }
 function closeHelpBtn() { document.getElementById('modal-help-overlay').classList.remove('visible'); }
@@ -769,6 +832,17 @@ async function submitToLeaderboard(silent = false) {
         accelerator_overlap: currentResult.accelerator_overlap, hackathon_precedent: currentResult.hackathon_precedent,
         archive_backing: currentResult.archive_backing, builder_density: currentResult.builder_density,
         summary: currentResult.summary,
+        competing_projects: JSON.stringify(currentResult.top_competing_projects || []),
+        insights: JSON.stringify({
+          novelty: currentResult.novelty_insight,
+          market_timing: currentResult.market_timing_insight,
+          competitive_gap: currentResult.competitive_gap_insight,
+          mechanism_design: currentResult.mechanism_design_insight,
+          accelerator_overlap: currentResult.accelerator_overlap_insight,
+          hackathon_precedent: currentResult.hackathon_precedent_insight,
+          archive_backing: currentResult.archive_backing_insight,
+          builder_density: currentResult.builder_density_insight,
+        }),
       }),
     });
     if (!res.ok) throw new Error('Submit failed');
@@ -802,7 +876,7 @@ function renderLeaderboard() {
     const rank = i+1;
     const rankDisplay = rank <= 3 ? medals[i] : rank;
     const xHtml = s.x_link ? `<div class="proj-x"><a href="${s.x_link}" target="_blank">${s.x_link.replace('https://x.com/','@').replace('https://twitter.com/','@')}</a></div>` : '';
-    return `<tr><td class="${rank<=3?'rank top':'rank'}">${rankDisplay}</td><td><div class="proj-name">${s.project_name}</div>${xHtml}</td><td><span class="cat-badge">${s.category}</span></td><td>${flag(s.country)}</td><td class="score-cell ${scoreClass(s.score)}">${Number(s.score).toFixed(2)}</td></tr>`;
+    return `<tr><td class="${rank<=3?'rank top':'rank'}">${rankDisplay}</td><td><div class="proj-name">${s.project_name}</div>${xHtml}</td><td><span class="cat-badge">${s.category}</span></td><td>${flag(s.country)}</td><td class="score-cell ${scoreClass(s.score)}">${Number(s.score).toFixed(2)}</td><td><button class="help-btn" onclick='openLbReport(${JSON.stringify(s).replace(/'/g,"&#39;")})'>See report</button></td></tr>`;
   }).join('');
 }
 
