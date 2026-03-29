@@ -528,7 +528,7 @@ function openLbReport(s) {
         <span class="dim-val ${scoreClass(val)}">${val}</span>
         <span class="dim-arrow">▼</span>
       </div>
-      ${insight ? `<div class="dim-insight">${insight}</div>` : ''}
+      ${insight ? `<div class="dim-insight">${insight}</div>` : `<div class="dim-insight" style="color:var(--muted2);font-style:italic;font-size:11px;">No insight stored — only available for new submissions.</div>`}
     </div>`;
   }).join('');
 
@@ -832,6 +832,17 @@ async function submitToLeaderboard(silent = false) {
         accelerator_overlap: currentResult.accelerator_overlap, hackathon_precedent: currentResult.hackathon_precedent,
         archive_backing: currentResult.archive_backing, builder_density: currentResult.builder_density,
         summary: currentResult.summary,
+        insights: JSON.stringify({
+          novelty: currentResult.novelty_insight,
+          market_timing: currentResult.market_timing_insight,
+          competitive_gap: currentResult.competitive_gap_insight,
+          mechanism_design: currentResult.mechanism_design_insight,
+          accelerator_overlap: currentResult.accelerator_overlap_insight,
+          hackathon_precedent: currentResult.hackathon_precedent_insight,
+          archive_backing: currentResult.archive_backing_insight,
+          builder_density: currentResult.builder_density_insight,
+        }),
+        competing_projects: JSON.stringify(currentResult.top_competing_projects || []),
         competing_projects: JSON.stringify(currentResult.top_competing_projects || []),
         insights: JSON.stringify({
           novelty: currentResult.novelty_insight,
